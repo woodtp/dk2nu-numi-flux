@@ -1,0 +1,6 @@
+*.txt
+!CMakeLists.txt
+*.root
+build/
+compile_commands.json
+.cache/
