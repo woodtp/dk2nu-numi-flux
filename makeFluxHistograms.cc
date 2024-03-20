@@ -247,6 +247,18 @@ public:
         const std::string thetaElabel_k0l = "hnu_thetaE_k0l_" + suffix;
         const std::string thetaElabel_mu = "hnu_thetaE_mu_" + suffix;
 
+        const std::string thetaYlabel = "hnu_thetaY_" + suffix;
+        const std::string thetaYlabel_pipm = "hnu_thetaY_pipm_" + suffix;
+        const std::string thetaYlabel_kpm = "hnu_thetaY_kpm_" + suffix;
+        const std::string thetaYlabel_k0l = "hnu_thetaY_k0l_" + suffix;
+        const std::string thetaYlabel_mu = "hnu_thetaY_mu_" + suffix;
+
+        const std::string thetaZlabel = "hnu_thetaZ_" + suffix;
+        const std::string thetaZlabel_pipm = "hnu_thetaZ_pipm_" + suffix;
+        const std::string thetaZlabel_kpm = "hnu_thetaZ_kpm_" + suffix;
+        const std::string thetaZlabel_k0l = "hnu_thetaZ_k0l_" + suffix;
+        const std::string thetaZlabel_mu = "hnu_thetaZ_mu_" + suffix;
+
         const std::string zElabel = "hnu_zE_" + suffix;
         const std::string zElabel_pipm = "hnu_zE_pipm_" + suffix;
         const std::string zElabel_kpm = "hnu_zE_kpm_" + suffix;
@@ -301,6 +313,18 @@ public:
         hnu_thetaE_kpm = TH2D(thetaElabel_kpm.c_str(), thetaElabel_kpm.c_str(), nbinsTh, thlow, thup, nbinsE, elow, eup);
         hnu_thetaE_k0l = TH2D(thetaElabel_k0l.c_str(), thetaElabel_k0l.c_str(), nbinsTh, thlow, thup, nbinsE, elow, eup);
         hnu_thetaE_mu = TH2D(thetaElabel_mu.c_str(), thetaElabel_mu.c_str(), nbinsTh, thlow, thup, nbinsE, elow, eup);
+
+        hnu_thetaY = TH2D(thetaYlabel.c_str(), thetaYlabel.c_str(), nbinsTh, thlow, thup, nbinsy, ylow, yup);
+        hnu_thetaY_pipm = TH2D(thetaYlabel_pipm.c_str(), thetaYlabel_pipm.c_str(), nbinsTh, thlow, thup, nbinsy, ylow, yup);
+        hnu_thetaY_kpm = TH2D(thetaYlabel_kpm.c_str(), thetaYlabel_kpm.c_str(), nbinsTh, thlow, thup, nbinsy, ylow, yup);
+        hnu_thetaY_k0l = TH2D(thetaYlabel_k0l.c_str(), thetaYlabel_k0l.c_str(), nbinsTh, thlow, thup, nbinsy, ylow, yup);
+        hnu_thetaY_mu = TH2D(thetaYlabel_mu.c_str(), thetaYlabel_mu.c_str(), nbinsTh, thlow, thup, nbinsy, ylow, yup);
+
+        hnu_thetaZ = TH2D(thetaZlabel.c_str(), thetaZlabel.c_str(), nbinsTh, thlow, thup, nbinsz, zlow, zup);
+        hnu_thetaZ_pipm = TH2D(thetaZlabel_pipm.c_str(), thetaZlabel_pipm.c_str(), nbinsTh, thlow, thup, nbinsz, zlow, zup);
+        hnu_thetaZ_kpm = TH2D(thetaZlabel_kpm.c_str(), thetaZlabel_kpm.c_str(), nbinsTh, thlow, thup, nbinsz, zlow, zup);
+        hnu_thetaZ_k0l = TH2D(thetaZlabel_k0l.c_str(), thetaZlabel_k0l.c_str(), nbinsTh, thlow, thup, nbinsz, zlow, zup);
+        hnu_thetaZ_mu = TH2D(thetaZlabel_mu.c_str(), thetaZlabel_mu.c_str(), nbinsTh, thlow, thup, nbinsz, zlow, zup);
 
         hnu_zE = TH2D(zElabel.c_str(), zElabel.c_str(), nbinsz, zlow, zup, nbinsE, elow, eup);
         hnu_zE_pipm = TH2D(zElabel_pipm.c_str(), zElabel_pipm.c_str(), nbinsz, zlow, zup, nbinsE, elow, eup);
@@ -365,6 +389,18 @@ public:
     TH2D hnu_thetaE_k0l;
     TH2D hnu_thetaE_mu;
 
+    TH2D hnu_thetaY;
+    TH2D hnu_thetaY_pipm;
+    TH2D hnu_thetaY_kpm;
+    TH2D hnu_thetaY_k0l;
+    TH2D hnu_thetaY_mu;
+
+    TH2D hnu_thetaZ;
+    TH2D hnu_thetaZ_pipm;
+    TH2D hnu_thetaZ_kpm;
+    TH2D hnu_thetaZ_k0l;
+    TH2D hnu_thetaZ_mu;
+
     TH2D hnu_zE;
     TH2D hnu_zE_pipm;
     TH2D hnu_zE_kpm;
@@ -419,6 +455,8 @@ void Spectra::FillSpectra(const bsim::Dk2Nu &dk2nu, const double wght, const dou
     hnu_E.Fill(nu_energy, wght);
     hnu_theta.Fill(theta_par, wght);
     hnu_thetaE.Fill(theta_par, nu_energy, wght);
+    hnu_thetaY.Fill(theta_par, nu_vy, wght);
+    hnu_thetaZ.Fill(theta_par, nu_vz, wght);
     hnu_yE.Fill(nu_vy, nu_energy, wght);
     hnu_zE.Fill(nu_vz, nu_energy, wght);
 
@@ -442,6 +480,8 @@ void Spectra::FillSpectra(const bsim::Dk2Nu &dk2nu, const double wght, const dou
         hnu_xy_pipm.Fill(nu_vx, nu_vy, wght);
         hnu_theta_pipm.Fill(theta_par, wght);
         hnu_thetaE_pipm.Fill(theta_par, nu_energy, wght);
+        hnu_thetaY_pipm.Fill(theta_par, nu_vy, wght);
+        hnu_thetaZ_pipm.Fill(theta_par, nu_vz, wght);
         hnu_yE_pipm.Fill(nu_vy, nu_energy, wght);
         hnu_zE_pipm.Fill(nu_vz, nu_energy, wght);
     }
@@ -453,6 +493,8 @@ void Spectra::FillSpectra(const bsim::Dk2Nu &dk2nu, const double wght, const dou
         hnu_xy_kpm.Fill(nu_vx, nu_vy, wght);
         hnu_theta_kpm.Fill(theta_par, wght);
         hnu_thetaE_kpm.Fill(theta_par, nu_energy, wght);
+        hnu_thetaY_kpm.Fill(theta_par, nu_vy, wght);
+        hnu_thetaZ_kpm.Fill(theta_par, nu_vz, wght);
         hnu_yE_kpm.Fill(nu_vy, nu_energy, wght);
         hnu_zE_kpm.Fill(nu_vz, nu_energy, wght);
     }
@@ -464,6 +506,8 @@ void Spectra::FillSpectra(const bsim::Dk2Nu &dk2nu, const double wght, const dou
         hnu_xy_k0l.Fill(nu_vx, nu_vy, wght);
         hnu_theta_k0l.Fill(theta_par, wght);
         hnu_thetaE_k0l.Fill(theta_par, nu_energy, wght);
+        hnu_thetaY_k0l.Fill(theta_par, nu_vy, wght);
+        hnu_thetaZ_k0l.Fill(theta_par, nu_vz, wght);
         hnu_yE_k0l.Fill(nu_vy, nu_energy, wght);
         hnu_zE_k0l.Fill(nu_vz, nu_energy, wght);
     }
@@ -475,6 +519,8 @@ void Spectra::FillSpectra(const bsim::Dk2Nu &dk2nu, const double wght, const dou
         hnu_xy_mu.Fill(nu_vx, nu_vy, wght);
         hnu_theta_mu.Fill(theta_par, wght);
         hnu_thetaE_mu.Fill(theta_par, nu_energy, wght);
+        hnu_thetaY_mu.Fill(theta_par, nu_vy, wght);
+        hnu_thetaZ_mu.Fill(theta_par, nu_vz, wght);
         hnu_yE_mu.Fill(nu_vy, nu_energy, wght);
         hnu_zE_mu.Fill(nu_vz, nu_energy, wght);
     }
@@ -499,6 +545,18 @@ void Spectra::WriteHistograms()
     hnu_thetaE_kpm.Write();
     hnu_thetaE_k0l.Write();
     hnu_thetaE_mu.Write();
+
+    hnu_thetaY.Write();
+    hnu_thetaY_pipm.Write();
+    hnu_thetaY_kpm.Write();
+    hnu_thetaY_k0l.Write();
+    hnu_thetaY_mu.Write();
+
+    hnu_thetaZ.Write();
+    hnu_thetaZ_pipm.Write();
+    hnu_thetaZ_kpm.Write();
+    hnu_thetaZ_k0l.Write();
+    hnu_thetaZ_mu.Write();
 
     hnu_zE.Write();
     hnu_zE_pipm.Write();
@@ -647,7 +705,8 @@ int main()
 
     auto const files_without_blocks = getFileList("files_without_blocks.txt");
     auto const files_with_blocks = getFileList("files_with_blocks.txt");
-    auto const files_with_blocks_kaons = getFileList("kaon_xsec_files.txt");
+    // auto const files_with_blocks_kaons = getFileList("kaon_xsec_files.txt");
+    auto const files_with_blocks_kaons = getFileList("updated_g4_filelist_50M_POT.txt");
 
     auto pChain_no_blocks = std::make_unique<TChain>("dk2nuTree");
     auto pChain_blocks = std::make_unique<TChain>("dk2nuTree");
