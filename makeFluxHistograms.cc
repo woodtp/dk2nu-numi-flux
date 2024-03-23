@@ -57,7 +57,14 @@ enum PDGID
     NUMU = 14,
     NUMUBAR = -14,
     NUTAU = 16,
-    NUTAUBAR = -16
+    NUTAUBAR = -16,
+    PROTON = 2212,
+    NEUTRON = 2112,
+    CARBON = 1000060120,
+    ALUMINUM = 1000130270,
+    IRON = 1000260560,
+    NULLTARGET = 1000000000,
+    ZERO = 0,
 };
 
 static const std::map<PDGID, double> pdgid2Mass = {{PIP, 0.13957039}, {PIM, .13957039}, {KP, 0.493677}, {KM, 0.493677}, {K0, 0.497611},
@@ -199,8 +206,10 @@ double GetWeight(const bsim::Dk2Nu &dk2nu, const std::array<double, 3> &detCoord
 class Spectra
 {
 public:
-    Spectra(const std::string &id, const int nu_pdg = -1) : nu(nu_pdg)
+    Spectra(const std::string &id, const int nu_pdg = -1)
     {
+        pdg2Index = {{PROTON, 0.5}, {NEUTRON, 1.5}, {PIP, 2.5}, {PIM, 3.5}, {KP, 4.5}, {KM, 5.5}, {K0L, 6.5}, {CARBON, 0.5}, {ALUMINUM, 1.5}, {IRON, 2.5}, {NULLTARGET, 3.5}, {ZERO, 4.5}};
+
         static constexpr int nbinsx = 80;
         static constexpr double xlow = -200.;
         static constexpr double xup = 200.;
@@ -228,6 +237,8 @@ public:
         }
 
         const std::string suffix = id + "_" + nu_suff;
+
+        const std::string ints_label = "hancestorInteractions_" + suffix;
 
         const std::string elabel = "hnu_E_" + suffix;
         const std::string elabel_pipm = "hnu_E_pipm_" + suffix;
@@ -295,6 +306,13 @@ public:
 
         const std::string xyzlabel = "hnu_xyz_" + suffix;
         const std::string xyzlabel_par = "hpar_xyz_" + suffix;
+
+        const std::string nints_label = "hnInteractions_" + suffix;
+        const std::string nnus_label = "hnNus_" + suffix;
+
+        hnInteractions = TH1I(nints_label.c_str(), nints_label.c_str(), 1, 0., 1.);
+        hnNeutrinos = TH1I(nnus_label.c_str(), nnus_label.c_str(), 1, 0., 1.);
+        hancestorInteractions = TH2F(ints_label.c_str(), ints_label.c_str(), 6, 0., 6., 8, 0., 8.);
 
         hnu_E = TH1D(elabel.c_str(), elabel.c_str(), nbinsE, elow, eup);
         hnu_E_pipm = TH1D(elabel_pipm.c_str(), elabel_pipm.c_str(), nbinsE, elow, eup);
@@ -369,7 +387,10 @@ public:
     void FillSpectra(const bsim::Dk2Nu &dk2nu, const double wght, const double nu_energy, const double theta_par);
     void WriteHistograms();
 
-    int nu;
+private:
+    long unsigned int nNeutrinos = 0;
+    long unsigned int nInteractions = 0;
+
 
     TH1D hnu_E;
     TH1D hnu_E_pipm;
@@ -382,6 +403,10 @@ public:
     TH1D hnu_theta_kpm;
     TH1D hnu_theta_k0l;
     TH1D hnu_theta_mu;
+
+    TH1I hnInteractions;
+    TH1I hnNeutrinos;
+    TH2F hancestorInteractions;
 
     TH2D hnu_thetaE;
     TH2D hnu_thetaE_pipm;
@@ -439,7 +464,24 @@ public:
 
     TH3D hnu_xyz;
     TH3D hpar_xyz;
+
+    std::map<PDGID, float> pdg2Index;
+    std::vector<std::pair<PDGID, PDGID>> IdentifyPrecursors(const bsim::Dk2Nu &dk2nu);
 };
+
+std::vector<std::pair<PDGID, PDGID>> Spectra::IdentifyPrecursors(const bsim::Dk2Nu &dk2nu)
+{
+    std::vector<std::pair<PDGID, PDGID>> precursors;
+    precursors.reserve(dk2nu.ancestor.size());
+    // for(auto const& ancestor : dk2nu.ancestor)
+    for(auto i = dk2nu.ancestor.begin(); i != dk2nu.ancestor.end() - 1; ++i)
+    {
+        const auto parent_ptype = static_cast<PDGID>(i->pdg);
+        const auto target_type = static_cast<PDGID>(i->nucleus);
+        precursors.emplace_back(std::make_pair(parent_ptype, target_type));
+    }
+    return precursors;
+}
 
 void Spectra::FillSpectra(const bsim::Dk2Nu &dk2nu, const double wght, const double nu_energy, const double theta_par)
 {
@@ -451,6 +493,31 @@ void Spectra::FillSpectra(const bsim::Dk2Nu &dk2nu, const double wght, const dou
     const double par_vx = dk2nu.ppvx;
     const double par_vy = dk2nu.ppvy;
     const double par_vz = dk2nu.ppvz;
+
+    if ( nu_energy > 0.4 )
+    {
+        nNeutrinos++;
+
+        auto const& precursors = IdentifyPrecursors(dk2nu);
+
+        for (auto const& precursor : precursors)
+        {
+            auto const &target = precursor.second;
+            auto const &proj = precursor.first;
+
+            // NULLTARGET occurs when there is a decay in flight or at rest, or when the neutrino is produced
+            // if (target == NULLTARGET || (proj != PROTON && target == 0))
+            // {
+            //     continue;
+            // }
+
+            nInteractions++;
+
+            auto const projIdx = pdg2Index.find(proj) != pdg2Index.end() ? pdg2Index.at(proj) : 7.5;
+            auto const targetIdx = pdg2Index.find(target) != pdg2Index.end() ? pdg2Index.at(target) : 5.5;
+            hancestorInteractions.Fill(targetIdx, projIdx, wght);
+        }
+    }
 
     hnu_E.Fill(nu_energy, wght);
     hnu_theta.Fill(theta_par, wght);
@@ -528,6 +595,13 @@ void Spectra::FillSpectra(const bsim::Dk2Nu &dk2nu, const double wght, const dou
 
 void Spectra::WriteHistograms()
 {
+    hnNeutrinos.SetBinContent(1, nNeutrinos);
+    hnInteractions.SetBinContent(1, nInteractions);
+
+    hnNeutrinos.Write();
+    hnInteractions.Write();
+    hancestorInteractions.Write();
+
     hnu_E.Write();
     hnu_E_pipm.Write();
     hnu_E_kpm.Write();
@@ -681,16 +755,14 @@ void runEventLoop(TChain &chain, const bsim::Dk2Nu *dk2nu, std::map<int, Spectra
 
         const double wght = GetWeight(*dk2nu, ICARUSCoords, nu_energy);
 
+        spec->FillSpectra(*dk2nu, wght, nu_energy, theta_par);
+
         if ((entry == 0) || (entry % 10000 == 0))
         {
             std::cout << "FILLING ENTRY " << entry << " / " << n_entries << " (" << pct << "%)"
                       << " WITH WEIGHT = " << wght << '\n';
-                      // << "  THETA = " << theta_par << "\n  dotProd = " << dotProd << "\n pmom (" << parentDecayP[0] << ", " << parentDecayP[1]
-                      // << ", " << parentDecayP[2] << ")"
-                      // << "\n  NU ENERGY = " << nu_energy << " GeV\n";
         }
 
-        spec->FillSpectra(*dk2nu, wght, nu_energy, theta_par);
     } // Event Loop
 } // runEventLoop
 
@@ -703,9 +775,12 @@ int main()
 
     static constexpr double pot_per_file = 500000.;
 
-    auto const files_without_blocks = getFileList("files_without_blocks.txt");
-    auto const files_with_blocks = getFileList("files_with_blocks.txt");
-    // auto const files_with_blocks_kaons = getFileList("kaon_xsec_files.txt");
+    // // auto const files_without_blocks = getFileList("files_without_blocks.txt");
+    // // auto const files_with_blocks = getFileList("files_with_blocks.txt");
+    // // auto const files_with_blocks_kaons = getFileList("kaon_xsec_files.txt");
+
+    auto const files_without_blocks = getFileList("default_files.txt");
+    auto const files_with_blocks = getFileList("g3Chase_files.txt");
     auto const files_with_blocks_kaons = getFileList("updated_g4_filelist_50M_POT.txt");
 
     auto pChain_no_blocks = std::make_unique<TChain>("dk2nuTree");
@@ -727,26 +802,20 @@ int main()
         pChain_blocks_kaons->Add(f.c_str());
     }
 
-    // auto pDk2nu_no_blocks = std::make_unique<bsim::Dk2Nu>();
-    // auto pDk2nu_blocks = std::make_unique<bsim::Dk2Nu>();
-
     const bsim::Dk2Nu dk2nu_no_blocks;
     const bsim::Dk2Nu dk2nu_blocks;
     const bsim::Dk2Nu dk2nu_blocks_kaons;
 
-    // Spectra spec_blocks("blocks");
     Spectra spec_fhc_numu_no_blocks("no_blocks", 14);
     Spectra spec_fhc_numubar_no_blocks("no_blocks", -14);
     Spectra spec_fhc_nue_no_blocks("no_blocks", 12);
     Spectra spec_fhc_nuebar_no_blocks("no_blocks", -12);
 
-    // Spectra spec_blocks("blocks");
     Spectra spec_fhc_numu_blocks("blocks", 14);
     Spectra spec_fhc_numubar_blocks("blocks", -14);
     Spectra spec_fhc_nue_blocks("blocks", 12);
     Spectra spec_fhc_nuebar_blocks("blocks", -12);
 
-    // Spectra spec_blocks_kaons("blocks_kaons");
     Spectra spec_fhc_numu_blocks_kaons("blocks_kaons", 14);
     Spectra spec_fhc_numubar_blocks_kaons("blocks_kaons", -14);
     Spectra spec_fhc_nue_blocks_kaons("blocks_kaons", 12);
@@ -770,10 +839,9 @@ int main()
 
     // g3Chase = true
     runEventLoop(*pChain_blocks, &dk2nu_blocks, spectra_blocks);
-    //
-    // // g3Chase = true + kaon xsec bugfix
-    runEventLoop(*pChain_blocks_kaons, &dk2nu_blocks_kaons, spectra_blocks_kaons);
 
+    // g3Chase = true + kaon xsec bugfix
+    runEventLoop(*pChain_blocks_kaons, &dk2nu_blocks_kaons, spectra_blocks_kaons);
     TH1D hpot_no_blocks("hpot_no_blocks", "hpot_no_blocks", 1, 0, 1);
     TH1D hpot_blocks("hpot_blocks", "hpot_blocks", 1, 0, 1);
     TH1D hpot_blocks_kaons("hpot_blocks_kaons", "hpot_blocks_kaons", 1, 0, 1);
