@@ -1,5 +1,4 @@
-#include "dk2nu/tree/dk2nu.h"
-#include "dk2nu/tree/dkmeta.h"
+#include "dk2nu.h"
 
 #include "TChain.h"
 #include "TFile.h"
@@ -388,9 +387,8 @@ public:
     void WriteHistograms();
 
 private:
-    long unsigned int nNeutrinos = 0;
-    long unsigned int nInteractions = 0;
-
+    double nNeutrinos = 0.;
+    double nInteractions = 0.;
 
     TH1D hnu_E;
     TH1D hnu_E_pipm;
@@ -474,12 +472,16 @@ std::vector<std::pair<PDGID, PDGID>> Spectra::IdentifyPrecursors(const bsim::Dk2
     std::vector<std::pair<PDGID, PDGID>> precursors;
     precursors.reserve(dk2nu.ancestor.size());
     // for(auto const& ancestor : dk2nu.ancestor)
-    for(auto i = dk2nu.ancestor.begin(); i != dk2nu.ancestor.end() - 1; ++i)
+    int count = 0;
+    for(std::size_t i = 0; i < dk2nu.ancestor.size(); ++i)
     {
-        const auto parent_ptype = static_cast<PDGID>(i->pdg);
-        const auto target_type = static_cast<PDGID>(i->nucleus);
+        const auto parent_ptype = static_cast<PDGID>(dk2nu.ancestor[i].pdg);
+        const auto target_type = static_cast<PDGID>(dk2nu.ancestor[i].nucleus);
+        // std::cout << count << " of " << dk2nu.ancestor.size() - 1 << ") PARENT: " << parent_ptype << " TARGET: " << target_type << '\n';
         precursors.emplace_back(std::make_pair(parent_ptype, target_type));
+        count++;
     }
+    std::cout << '\n';
     return precursors;
 }
 
@@ -494,24 +496,20 @@ void Spectra::FillSpectra(const bsim::Dk2Nu &dk2nu, const double wght, const dou
     const double par_vy = dk2nu.ppvy;
     const double par_vz = dk2nu.ppvz;
 
-    if ( nu_energy > 0.4 )
+    auto const ptype = std::abs(dk2nu.decay.ptype);
+
+    if ( nu_energy > 0.4  && std::abs(ptype) == KP)
     {
-        nNeutrinos++;
+        nNeutrinos += wght;
 
         auto const& precursors = IdentifyPrecursors(dk2nu);
+
+        nInteractions += wght * precursors.size();
 
         for (auto const& precursor : precursors)
         {
             auto const &target = precursor.second;
             auto const &proj = precursor.first;
-
-            // NULLTARGET occurs when there is a decay in flight or at rest, or when the neutrino is produced
-            // if (target == NULLTARGET || (proj != PROTON && target == 0))
-            // {
-            //     continue;
-            // }
-
-            nInteractions++;
 
             auto const projIdx = pdg2Index.find(proj) != pdg2Index.end() ? pdg2Index.at(proj) : 7.5;
             auto const targetIdx = pdg2Index.find(target) != pdg2Index.end() ? pdg2Index.at(target) : 5.5;
@@ -537,7 +535,6 @@ void Spectra::FillSpectra(const bsim::Dk2Nu &dk2nu, const double wght, const dou
     hpar_xy.Fill(par_vx, par_vy, wght);
     hpar_xyz.Fill(par_vx, par_vy, par_vz, wght);
 
-    auto const ptype = std::abs(dk2nu.decay.ptype);
 
     if (ptype == PDGID::PIP)
     {
@@ -595,8 +592,12 @@ void Spectra::FillSpectra(const bsim::Dk2Nu &dk2nu, const double wght, const dou
 
 void Spectra::WriteHistograms()
 {
+    std::cout << "TOTAL NUMBER NUS: " << nNeutrinos << std::endl;
     hnNeutrinos.SetBinContent(1, nNeutrinos);
     hnInteractions.SetBinContent(1, nInteractions);
+
+    // Compute the average number of interactions per neutrino
+    hancestorInteractions.Scale(1. / nNeutrinos);
 
     hnNeutrinos.Write();
     hnInteractions.Write();
@@ -842,6 +843,7 @@ int main()
 
     // g3Chase = true + kaon xsec bugfix
     runEventLoop(*pChain_blocks_kaons, &dk2nu_blocks_kaons, spectra_blocks_kaons);
+
     TH1D hpot_no_blocks("hpot_no_blocks", "hpot_no_blocks", 1, 0, 1);
     TH1D hpot_blocks("hpot_blocks", "hpot_blocks", 1, 0, 1);
     TH1D hpot_blocks_kaons("hpot_blocks_kaons", "hpot_blocks_kaons", 1, 0, 1);
