@@ -11,7 +11,7 @@
 #include <cmath>
 #include <fstream>
 #include <iostream>
-#include <map>
+#include <unordered_map>
 #include <memory>
 #include <string>
 #include <vector>
@@ -66,7 +66,7 @@ enum PDGID
     ZERO = 0,
 };
 
-static const std::map<PDGID, double> pdgid2Mass = {{PIP, 0.13957039}, {PIM, .13957039}, {KP, 0.493677}, {KM, 0.493677}, {K0, 0.497611},
+static const std::unordered_map<PDGID, double> pdgid2Mass = {{PIP, 0.13957039}, {PIM, .13957039}, {KP, 0.493677}, {KM, 0.493677}, {K0, 0.497611},
     {K0L, 0.497611}, {K0S, 0.497611}, {MUM, 0.1056583755}, {MUP, 0.1056583755}, {TAUM, 1.77686}, {TAUP, 1.77686}};
 
 double GetWeight(const bsim::Dk2Nu &dk2nu, const std::array<double, 3> &detCoords, double &nu_energy)
@@ -463,7 +463,7 @@ private:
     TH3D hnu_xyz;
     TH3D hpar_xyz;
 
-    std::map<PDGID, float> pdg2Index;
+    std::unordered_map<PDGID, float> pdg2Index;
     std::vector<std::pair<PDGID, PDGID>> IdentifyPrecursors(const bsim::Dk2Nu &dk2nu);
 };
 
@@ -713,7 +713,7 @@ double calculateTheta(const std::array<double, 3> &u, const std::array<double, 3
     return std::acos(costh); // [rad]
 }
 
-void runEventLoop(TChain &chain, const bsim::Dk2Nu *dk2nu, std::map<int, Spectra *> &spectra)
+void runEventLoop(TChain &chain, const bsim::Dk2Nu *dk2nu, std::unordered_map<int, Spectra *> &spectra)
 {
     chain.SetBranchAddress("dk2nu", &dk2nu);
 
@@ -822,13 +822,13 @@ int main()
     Spectra spec_fhc_nue_blocks_kaons("blocks_kaons", 12);
     Spectra spec_fhc_nuebar_blocks_kaons("blocks_kaons", -12);
 
-    std::map<int, Spectra *> spectra_no_blocks = {{14, &spec_fhc_numu_no_blocks}, {-14, &spec_fhc_numubar_no_blocks},
+    std::unordered_map<int, Spectra *> spectra_no_blocks = {{14, &spec_fhc_numu_no_blocks}, {-14, &spec_fhc_numubar_no_blocks},
         {12, &spec_fhc_nue_no_blocks}, {-12, &spec_fhc_nuebar_no_blocks}};
 
-    std::map<int, Spectra *> spectra_blocks = {
+    std::unordered_map<int, Spectra *> spectra_blocks = {
         {14, &spec_fhc_numu_blocks}, {-14, &spec_fhc_numubar_blocks}, {12, &spec_fhc_nue_blocks}, {-12, &spec_fhc_nuebar_blocks}};
 
-    std::map<int, Spectra *> spectra_blocks_kaons = {{14, &spec_fhc_numu_blocks_kaons}, {-14, &spec_fhc_numubar_blocks_kaons},
+    std::unordered_map<int, Spectra *> spectra_blocks_kaons = {{14, &spec_fhc_numu_blocks_kaons}, {-14, &spec_fhc_numubar_blocks_kaons},
         {12, &spec_fhc_nue_blocks_kaons}, {-12, &spec_fhc_nuebar_blocks_kaons}};
 
     const double total_pot_no_blocks = pot_per_file * (double)files_without_blocks.size();
