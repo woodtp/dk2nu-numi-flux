@@ -10,6 +10,6 @@ link_directories($ENV{DK2NU_LIB} $ENV{ROOTSYS}/lib)
 
 set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -O3 -Wall -Werror -Wextra")
 
-add_executable(makeFluxHistograms makeFluxHistograms.cc)
+add_executable(makeFluxHistograms makeFluxHistograms.cc helper.h vecops.h vecops.cc pdgid.h spectra.h spectra.cc)
 
 target_link_libraries(makeFluxHistograms dk2nuTree ${ROOT_LIBRARIES})
