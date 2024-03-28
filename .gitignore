@@ -1,4 +1,5 @@
 *.txt
+!file_lists/*.txt
 !CMakeLists.txt
 *.root
 build/
