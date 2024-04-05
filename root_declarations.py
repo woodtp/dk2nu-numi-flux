@@ -147,3 +147,45 @@ def theta_p(p: np.ndarray, det_loc: np.ndarray) -> float:
     if (crossprod @ n) < 0:
         theta = -theta
     return theta
+
+@ROOT.Numba.Declare(["RVec<int>"], "RVec<int>")
+def parent_to_code(parents: np.ndarray) -> np.ndarray:
+    def codes(pdg):
+        if pdg == 2212:
+            return 0
+        if pdg == 2112:
+            return 1
+        if pdg == 211:
+            return 2
+        if pdg == -211:
+            return 3
+        if pdg == 321:
+            return 4
+        if pdg == -321:
+            return 5
+        if pdg == 130:
+            return 6
+        if pdg == 13:
+            return 7
+        if pdg == -13:
+            return 8
+        else:
+            return 9
+
+    return np.array([codes(p) for p in parents[:-1]], dtype=np.int32)
+
+@ROOT.Numba.Declare(["RVec<int>"], "RVec<int>")
+def target_to_code(targets: np.ndarray) -> np.ndarray:
+    def codes(pdg):
+        if pdg == 1000060120:  # carbon
+            return 0
+        if pdg == 1000130270:  # aluminum
+            return 1
+        if pdg == 1000260560:  # iron
+            return 2
+        if pdg == 0 or pdg == 1000000000:  # start process or decay
+            return 4
+        else:
+            return 3
+
+    return np.array([codes(p) for p in targets[1:]], dtype=np.int32)

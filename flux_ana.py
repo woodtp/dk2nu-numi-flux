@@ -21,53 +21,10 @@ POT_PER_FILE = 500_000
 ICARUS = [450.37, 7991.98, 79512.66]
 TWOXTWO = [0, 0, 103648.837]
 
+
 def get_pot(file_path: str, pattern: str) -> int:
     nfiles = len(list(Path(file_path).glob(pattern)))
     return POT_PER_FILE * nfiles
-
-@ROOT.Numba.Declare(["RVec<int>"], "RVec<int>")
-def parent_to_code(parents: np.ndarray) -> np.ndarray:
-    def codes(pdg):
-        if pdg == 2212:
-            return 0
-        if pdg == 2112:
-            return 1
-        if pdg == 211:
-            return 2
-        if pdg == -211:
-            return 3
-        if pdg == 321:
-            return 4
-        if pdg == -321:
-            return 5
-        if pdg == 130:
-            return 6
-        if pdg == 13:
-            return 7
-        if pdg == -13:
-            return 8
-        else:
-            return 9
-
-    return np.array([codes(p) for p in parents[:-1]], dtype=np.int32)
-
-@ROOT.Numba.Declare(["RVec<int>"], "RVec<int>")
-def target_to_code(targets: np.ndarray) -> np.ndarray:
-    def codes(pdg):
-        if pdg == 1000060120:  # carbon
-            return 0
-        if pdg == 1000130270:  # aluminum
-            return 1
-        if pdg == 1000260560:  # iron
-            return 2
-        if pdg == 0 or pdg == 1000000000:  # start process or decay
-            return 4
-        else:
-            return 3
-
-    return np.array([codes(p) for p in targets[1:]], dtype=np.int32)
-
-
 
 
 def run_analysis(df: ROOT.RDataFrame, det_loc: list[float]) -> ROOT.RDataFrame:
@@ -94,7 +51,10 @@ def run_analysis(df: ROOT.RDataFrame, det_loc: list[float]) -> ROOT.RDataFrame:
         .Define("pgamma", "Numba::calc_gamma(parent_energy, parent_mass)")
         .Define("emrat", "Numba::calc_energy_in_beam(pgamma, costh)")
         .Define("nu_energy", "dk2nu.decay.necm * emrat")
-        .Define("weight", "calc_weight(dk2nu.decay, sangdet, emrat, parent_energy, nu_energy, pgamma, rr)")
+        .Define(
+            "weight",
+            "calc_weight(dk2nu.decay, sangdet, emrat, parent_energy, nu_energy, pgamma, rr)",
+        )
         .Define("theta_p", "Numba::theta_p(parent_momentum, det_loc)")
         .Define("par_codes", "Numba::parent_to_code(dk2nu.ancestor.pdg)")
         .Define("target_codes", "Numba::target_to_code(dk2nu.ancestor.nucleus)")
@@ -117,11 +77,12 @@ def main() -> None:
     print(pot)
 
     numu = df.Filter("(dk2nu.decay.ntype == 14) && (nu_energy > 0.4)")
-    numu_count  = numu.Sum("weight").GetValue()
+    numu_count = numu.Sum("weight").GetValue()
     print(f"numu count: {numu_count}")
 
-    h = numu.Histo2D(("ints", "ints", 5, 0, 5, 9, 0, 9), "par_codes", "target_codes", "weight")
-
+    h = numu.Histo2D(
+        ("ints", "ints", 5, 0, 5, 9, 0, 9), "par_codes", "target_codes", "weight"
+    )
 
     # print(h_tot)
 
