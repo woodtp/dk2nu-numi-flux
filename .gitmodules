@@ -1,0 +1,3 @@
+[submodule "dk2nu"]
+	path = dk2nu
+	url = https://github.com/NuSoftHEP/dk2nu.git

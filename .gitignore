@@ -8,3 +8,4 @@ compile_commands.json
 *.log
 makeFluxHistograms
 venv/
+__pychache__
