@@ -2,7 +2,11 @@
 
 ## Instructions to build
 ```sh
-$ mkdir build
-$ source setup.sh
-$ cd build && cmake .. && make
+$ . ./build.sh  # Build the project, have to source instead of execute if on a FNAL GPVM
+```
+
+## Running the code
+```sh
+$ . setup.sh  # Setup the environment, have to source instead of execute if on a FNAL GPVM
+$ ./flux_ana.py  # Run the code
 ```
