@@ -10,7 +10,7 @@ double calc_weight(const bsim::Decay& decay,
               const ROOT::RVecD& rr
               )
 {
-    double wght = (det_angle * decay.nimpwt * (energy_ratio * energy_ratio)) / 3.1416;
+    double wght = (det_angle * decay.nimpwt * (energy_ratio * energy_ratio));
 
     if (std::abs(decay.ptype) != 13) {
         return wght;
@@ -23,9 +23,6 @@ double calc_weight(const bsim::Decay& decay,
     beta[1] = decay.pdpy / parent_energy;
     beta[2] = decay.pdpz / parent_energy;
 
-    // const double rrx = det_loc[0] - decay.vx;
-    // const double rry = det_loc[1] - decay.vy;
-    // const double rrz = det_loc[2] - decay.vz;
     const double rr_mag = std::sqrt(rr[0] * rr[0] + rr[1] * rr[1] + rr[2] * rr[2]);
 
     p_nu[0] = rr[0] * nu_energy / rr_mag;
