@@ -135,6 +135,10 @@ double GetWeight(const bsim::Dk2Nu& dk2nu,
   return wght;
 }
 
+// static const std::array<double, 3> ICARUSCoords = {450.37, 7991.98, 79512.66};
+static constexpr std::array<double, 3> TWOXTWOCoords = {0., 0., 103648.837};
+static constexpr std::array<double, 3> NuMIAxis = {0., 0., 1.};
+
 void runEventLoop(TChain& chain,
                   const bsim::Dk2Nu* dk2nu,
                   std::unordered_map<int, Spectra*>& spectra,
@@ -142,10 +146,9 @@ void runEventLoop(TChain& chain,
 {
   chain.SetBranchAddress("dk2nu", &dk2nu);
 
-  static const std::array<double, 3> ICARUSCoords = {450.37, 7991.98, 79512.66};
-  static const std::array<double, 3> NuMIAxis = {0., 0., 1.};
+  auto const& coords = TWOXTWOCoords;
 
-  static const auto n = vecops::cross(ICARUSCoords, NuMIAxis);
+  static const auto n = vecops::cross(coords, NuMIAxis);
   static constexpr double magN = 1.;
 
   const unsigned int n_entries = chain.GetEntries();
@@ -177,7 +180,7 @@ void runEventLoop(TChain& chain,
 
     if (dotProd < 0.) { theta_par *= -1.; }
 
-    const double wght = GetWeight(*dk2nu, ICARUSCoords, nu_energy);
+    const double wght = GetWeight(*dk2nu, coords, nu_energy);
 
     spec->FillSpectra(*dk2nu, wght, nu_energy, theta_par);
 

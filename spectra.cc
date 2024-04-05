@@ -258,7 +258,7 @@ void Spectra::FillSpectra(const bsim::Dk2Nu& dk2nu,
 
     nInteractions += wght * precursors.size();
 
-    int i = 1;
+    // int i = 1;
     for (auto const& precursor : precursors) {
       auto const& target = precursor.second;
       auto const& proj = precursor.first;
@@ -271,7 +271,7 @@ void Spectra::FillSpectra(const bsim::Dk2Nu& dk2nu,
       //   // continue;
       // }
       hancestorInteractions.Fill(targetIdx, projIdx, wght);
-      i++;
+      // i++;
     }
   }
 
