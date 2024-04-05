@@ -9,4 +9,5 @@ compile_commands.json
 makeFluxHistograms
 venv/
 __pycache__
-**/build
+dk2nu/build/
+**/build/
