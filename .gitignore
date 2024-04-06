@@ -12,3 +12,4 @@ venv/
 __pycache__
 dk2nu/build/
 **/build/
+*.o
