@@ -13,3 +13,4 @@ __pycache__
 dk2nu/build/
 **/build/
 *.o
+*.so
