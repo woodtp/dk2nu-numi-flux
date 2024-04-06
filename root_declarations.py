@@ -1,17 +1,19 @@
 import os
+import logging
 
 import ROOT
 import numpy as np
 
 
-def set_ROOT_opts(det_loc: list[float]) -> None:
-    dk2nu_lib = os.environ["DK2NU_LIB"]
-    ROOT.gSystem.Load(f"{dk2nu_lib}/libdk2nuTree.so")
+logging.info("jit'ing functions...")
+
+def set_ROOT_opts() -> None:
+    logging.info("Setting ROOT options and loading libraries")
     ROOT.gROOT.SetBatch(True)
     ROOT.EnableImplicitMT()
-    ROOT.gInterpreter.Declare(
-        f"static const std::array<double, 3> DETECTOR_LOCATION = {{{det_loc[0]}, {det_loc[1]}, {det_loc[2]}}};"
-    )
+    dk2nu_lib = os.environ["DK2NU_LIB"]
+    ROOT.gSystem.Load(f"{dk2nu_lib}/libdk2nuTree.so")
+    ROOT.gSystem.Load("./libWeight.so")
     ROOT.gInterpreter.Declare('#include "Weight.h"')
 
 

@@ -1,20 +1,25 @@
-#!/u/bin/env python3
+#!/usr/bin/env python3
 
+import sys
+import logging
 import time
 from pathlib import Path
 
-import ROOT
-# import numpy as np
-# import mplhep as hep
-# import matplotlib.pyplot as plt
+logging.basicConfig(level=logging.INFO, format="[%(levelname)s] %(message)s")
+
+import ROOT  # type: ignore
 
 from root_declarations import set_ROOT_opts
-from spectra_definitions import apply_defs, build_histograms
+from spectra_definitions import apply_defs
 
 
-UPDATED_G4_FILES = {
-    "fhc": "/exp/icarus/data/users/awood/uboone_beamsim_g4.10.4/me000z200i/run0/files",
-    "rhc": "/exp/icarus/data/users/awood/uboone_beamsim_g4.10.4/me000z-200i/run0/files",
+FILE_SETS = {
+    "nominal_fhc":  "/pnfs/icarus/persistent/users/awood/g4numi_checks/FHC/false/g4numi*.root",
+    "nominal_rhc":  "/pnfs/icarus/persistent/users/awood/g4numi_checks/RHC/false/g4numi*.root",
+    "g3Chase_fhc":  "/pnfs/icarus/persistent/users/awood/g4numi_checks/FHC/true/g4numi*.root",
+    "g3Chase_rhc":  "/pnfs/icarus/persistent/users/awood/g4numi_checks/RHC/true/g4numi*.root",
+    "g4Update_fhc": "/exp/icarus/data/users/awood/uboone_beamsim_g4.10.4/me000z200i/run0/files/g4numi*.root",
+    "g4Update_rhc": "/exp/icarus/data/users/awood/uboone_beamsim_g4.10.4/me000z-200i/run0/files/g4numi*.root",
 }
 
 POT_PER_FILE = 500_000
@@ -23,88 +28,81 @@ ICARUS = [450.37, 7991.98, 79512.66]
 TWOXTWO = [0, 0, 103648.837]
 
 
-def get_pot(file_path: str, pattern: str) -> int:
-    nfiles = len(list(Path(file_path).glob(pattern)))
+def get_pot(files: str) -> int:
+    path, pattern = files.rsplit("/", 1)
+    nfiles = len(list(Path(path).glob(pattern)))
     return POT_PER_FILE * nfiles
 
 
-# def run_analysis(df: ROOT.RDataFrame, det_loc: list[float]) -> ROOT.RDataFrame:
-#     rvec_init_str = f"ROOT::RVecD{{ {det_loc[0]}, {det_loc[1]}, {det_loc[2]} }}"
-#
-#     df = (
-#         df.Define("det_loc", rvec_init_str)
-#         .Define(
-#             "decay_vertex",
-#             "ROOT::RVecD{dk2nu.decay.vx, dk2nu.decay.vy, dk2nu.decay.vz}",
-#         )
-#         .Define("rr", "det_loc - decay_vertex")
-#         .Define(
-#             "parent_momentum",
-#             "ROOT::RVecD{dk2nu.decay.pdpx, dk2nu.decay.pdpy, dk2nu.decay.pdpz}",
-#         )
-#         .Define("sangdet", "Numba::calc_solid_angle(rr)")
-#         .Define("costh", "Numba::calc_costheta_par(parent_momentum, rr)")
-#         .Define("parent_mass", "Numba::pdg_to_mass(dk2nu.decay.ptype)")
-#         .Define(
-#             "parent_energy",
-#             "Numba::calc_energy(parent_momentum, parent_mass)",
-#         )
-#         .Define("pgamma", "Numba::calc_gamma(parent_energy, parent_mass)")
-#         .Define("emrat", "Numba::calc_energy_in_beam(pgamma, costh)")
-#         .Define("nu_energy", "dk2nu.decay.necm * emrat")
-#         .Define(
-#             "weight",
-#             "calc_weight(dk2nu.decay, sangdet, emrat, parent_energy, nu_energy, pgamma, rr)",
-#         )
-#         .Define("theta_p", "Numba::theta_p(parent_momentum, det_loc)")
-#         .Define("par_codes", "Numba::parent_to_code(dk2nu.ancestor.pdg)")
-#         .Define("target_codes", "Numba::target_to_code(dk2nu.ancestor.nucleus)")
-#     )
-#     return df
-#
-
-def main() -> None:
-    set_ROOT_opts(ICARUS)
-    glob = "g4numi*.root"
-    pot = get_pot(UPDATED_G4_FILES["fhc"], glob)
-
-    df = ROOT.RDataFrame(
-        "dk2nuTree",
-        f"{UPDATED_G4_FILES['fhc']}/{glob}",
-    )
+def run_analysis(in_fname: str, out_fname: str, tree_name: str) -> None:
+    df = ROOT.RDataFrame("dk2nuTree", in_fname)
 
     df = apply_defs(df, ICARUS)
-    spectra = build_histograms("fhc", "numu")
 
-    print(f"POT: {pot:_}")
+    branches = [
+        "nu_pdg",
+        "parent_pdg",
+        "weight",
+        "nu_energy",
+        "vx",
+        "vy",
+        "vz",
+        "ppvx",
+        "ppvy",
+        "ppvz",
+        "pdpx",
+        "pdpy",
+        "pdpz",
+        "theta_p",
+        "par_codes",
+        "target_codes",
+    ]
 
-    numu = df.Filter("(dk2nu.decay.ntype == 14) && (nu_energy > 0.4)")
-    numu_count = numu.Sum("weight").GetValue()
-    print(f"numu count: {numu_count}")
+    tree_log_str = f"Preparing Tree '{tree_name}' with branches:\n\n"
+    for branch in branches:
+        tree_log_str += "* " + branch + "\n"
 
-    H = []
-    for name, hist in spectra.items():
-        H.append((name, hist(df)))
+    logging.info(tree_log_str)
 
-    hpot = ROOT.TH1D("hpot", "POT", 1, 0, 1)
-    hpot.SetBinContent(1, pot)
-    with ROOT.TFile.Open("test.root", "RECREATE") as f:
-        for name, h in H:
-            h.Draw()  # make sure it's ready
-            f.WriteObject(h, name)
-        f.WriteObject(hpot, "hpot")
+    logging.info(
+        f"Snapshotting to {out_fname}. Event loop will be executed now, this might take a while..."
+    )
+
+    opts = ROOT.RDF.RSnapshotOptions()
+    opts.fMode = "UPDATE"
+
+    df.Snapshot(tree_name, out_fname, branches, opts)  # type: ignore
 
 
-    # h = numu.Histo2D(
-    #     ("ints", "ints", 5, 0, 5, 9, 0, 9), "par_codes", "target_codes", "weight"
-    # )
-    #
-    # # print(h_tot)
-    #
-    # h.Scale(1.0 / numu_count)
-    #
-    # hep.hist2dplot(h, flow=None)
-    # plt.savefig("test.pdf")
+def load_file(fname: str) -> ROOT.RDataFrame:
+    return ROOT.RDataFrame("fluxTree", fname)
+
+
+def main() -> None:
+    out_fname = Path("test.root")
+
+    overwrite = True
+    file_exists = out_fname.exists()
+
+    if file_exists and not overwrite:
+        logging.info(f"{out_fname} already exists and overwriting disabled. Exiting...")
+        sys.exit()
+    elif file_exists and overwrite:
+        logging.info(f"Overwriting {out_fname}")
+        out_fname.unlink()
+
+    set_ROOT_opts()
+    for horn, files in FILE_SETS.items():
+        tree_name = f"fluxTree_{horn}"
+        run_analysis(files, str(out_fname), tree_name)
+
+    for horn, files in FILE_SETS.items():
+        pot = get_pot(files)
+        hpot = ROOT.TH1D(f"hpot_{horn}", "POT", 1, 0, 1)
+        hpot.SetBinContent(1, pot)
+        logging.info(f"POT = {pot:_}. Writing to {out_fname}:{hpot.GetName()}")
+        with ROOT.TFile.Open(str(out_fname), "UPDATE") as _:
+            hpot.Write()
 
 
 if __name__ == "__main__":
