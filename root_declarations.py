@@ -178,7 +178,7 @@ def parent_to_code(parents: np.ndarray) -> np.ndarray:
 
 @ROOT.Numba.Declare(["RVec<int>"], "RVec<int>")
 def target_to_code(targets: np.ndarray) -> np.ndarray:
-    def codes(pdg):
+    def _codes(pdg):
         if pdg == 1000060120:  # carbon
             return 0
         if pdg == 1000130270:  # aluminum
@@ -190,4 +190,7 @@ def target_to_code(targets: np.ndarray) -> np.ndarray:
         else:
             return 3
 
-    return np.array([codes(p) for p in targets[1:]], dtype=np.int32)
+    # account for the apparent Geant4 convention change
+    if targets[0] == 0:
+        return np.array([_codes(p) for p in targets[1:]], dtype=np.int32)
+    return np.array([_codes(p) for p in targets[:-1]], dtype=np.int32)

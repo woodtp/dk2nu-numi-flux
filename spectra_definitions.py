@@ -11,20 +11,21 @@ def apply_defs(df: ROOT.RDataFrame, det_loc: list[float]) -> ROOT.RDataFrame:
         .Alias("pdpx", "dk2nu.decay.pdpx")
         .Alias("pdpy", "dk2nu.decay.pdpy")
         .Alias("pdpz", "dk2nu.decay.pdpz")
-        .Define("det_loc", f"ROOT::RVecD{{ {det_loc[0]}, {det_loc[1]}, {det_loc[2]} }}")
+        .Define("det_loc", f"ROOT::RVec<double>{{ {det_loc[0]}, {det_loc[1]}, {det_loc[2]} }}")
         .Define(
             "decay_vertex",
-            "ROOT::RVecD{vx, vy, vz}",
+            "ROOT::RVec<double>{vx, vy, vz}",
         )
         .Define("rr", "det_loc - decay_vertex")
+        .Define("parent_momentum", "sqrt(pdpx*pdpx + pdpy*pdpy + pdpz*pdpz)")
         .Define(
-            "parent_momentum",
-            "ROOT::RVecD{pdpx, pdpy, pdpz}",
+            "v_parent_momentum",
+            "ROOT::RVec<double>{pdpx, pdpy, pdpz}",
         )
         .Define("sangdet", "Numba::calc_solid_angle(rr)")
-        .Define("costh", "Numba::calc_costheta_par(parent_momentum, rr)")
+        .Define("costh", "Numba::calc_costheta_par(v_parent_momentum, rr)")
         .Define("parent_mass", "Numba::pdg_to_mass(parent_pdg)")
-        .Define("parent_energy", "Numba::calc_energy(parent_momentum, parent_mass)")
+        .Define("parent_energy", "Numba::calc_energy(v_parent_momentum, parent_mass)")
         .Define("pgamma", "Numba::calc_gamma(parent_energy, parent_mass)")
         .Define("emrat", "Numba::calc_energy_in_beam(pgamma, costh)")
         .Define("nu_energy", "dk2nu.decay.necm * emrat")
@@ -32,7 +33,7 @@ def apply_defs(df: ROOT.RDataFrame, det_loc: list[float]) -> ROOT.RDataFrame:
             "weight",
             "calc_weight(dk2nu.decay, sangdet, emrat, parent_energy, nu_energy, pgamma, rr)",
         )
-        .Define("theta_p", "Numba::theta_p(parent_momentum, det_loc)")
+        .Define("theta_p", "Numba::theta_p(v_parent_momentum, det_loc)")
         .Define("par_codes", "Numba::parent_to_code(dk2nu.ancestor.pdg)")
         .Define("target_codes", "Numba::target_to_code(dk2nu.ancestor.nucleus)")
     )

@@ -1,25 +1,27 @@
 #!/usr/bin/env python3
 
-import sys
+import datetime
 import logging
+import sys
 import time
 from pathlib import Path
 
 logging.basicConfig(level=logging.INFO, format="[%(levelname)s] %(message)s")
 
 import ROOT  # type: ignore
+import numpy as np
 
 from root_declarations import set_ROOT_opts
 from spectra_definitions import apply_defs
 
 
 FILE_SETS = {
-    "nominal_fhc":  "/pnfs/icarus/persistent/users/awood/g4numi_checks/FHC/false/g4numi*.root",
-    "nominal_rhc":  "/pnfs/icarus/persistent/users/awood/g4numi_checks/RHC/false/g4numi*.root",
+    # "nominal_fhc":  "/pnfs/icarus/persistent/users/awood/g4numi_checks/FHC/false/g4numi*.root",
+    # "nominal_rhc":  "/pnfs/icarus/persistent/users/awood/g4numi_checks/RHC/false/g4numi*.root",
     "g3Chase_fhc":  "/pnfs/icarus/persistent/users/awood/g4numi_checks/FHC/true/g4numi*.root",
-    "g3Chase_rhc":  "/pnfs/icarus/persistent/users/awood/g4numi_checks/RHC/true/g4numi*.root",
-    "g4Update_fhc": "/exp/icarus/data/users/awood/uboone_beamsim_g4.10.4/me000z200i/run0/files/g4numi*.root",
-    "g4Update_rhc": "/exp/icarus/data/users/awood/uboone_beamsim_g4.10.4/me000z-200i/run0/files/g4numi*.root",
+    # "g3Chase_rhc":  "/pnfs/icarus/persistent/users/awood/g4numi_checks/RHC/true/g4numi*.root",
+    # "g4Update_fhc": "/exp/icarus/data/users/awood/uboone_beamsim_g4.10.4/me000z200i/run0/files/g4numi*.root",
+    # "g4Update_rhc": "/exp/icarus/data/users/awood/uboone_beamsim_g4.10.4/me000z-200i/run0/files/g4numi*.root",
 }
 
 POT_PER_FILE = 500_000
@@ -53,6 +55,7 @@ def run_analysis(in_fname: str, out_fname: str, tree_name: str) -> None:
         "pdpx",
         "pdpy",
         "pdpz",
+        "parent_momentum",
         "theta_p",
         "par_codes",
         "target_codes",
@@ -80,6 +83,7 @@ def load_file(fname: str) -> ROOT.RDataFrame:
 
 def main() -> None:
     out_fname = Path("test.root")
+    # out_fname = Path("debug.root")
 
     overwrite = True
     file_exists = out_fname.exists()
@@ -109,4 +113,4 @@ if __name__ == "__main__":
     start = time.perf_counter()
     main()
     end = time.perf_counter()
-    print(f"\nFinished in {end - start:0.2f} s")
+    print(f"\nFinished in {datetime.timedelta(seconds=end - start)}")
