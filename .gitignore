@@ -1,4 +1,5 @@
 *.txt
+!requirements.txt
 !file_lists/*.txt
 !CMakeLists.txt
 *.root
@@ -10,3 +11,6 @@ makeFluxHistograms
 venv/
 __pycache__
 dk2nu/build/
+**/build/
+*.o
+*.so
