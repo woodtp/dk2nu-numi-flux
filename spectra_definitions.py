@@ -36,6 +36,10 @@ def apply_defs(df: ROOT.RDataFrame, det_loc: list[float]) -> ROOT.RDataFrame:
         .Define("theta_p", "Numba::theta_p(v_parent_momentum, det_loc)")
         .Define("par_codes", "Numba::parent_to_code(dk2nu.ancestor.pdg)")
         .Define("target_codes", "Numba::target_to_code(dk2nu.ancestor.nucleus)")
+        .Define("ancestor_parent_pdg", "Numba::ancestor_parent_pdg(dk2nu.ancestor.pdg)")
+        .Define("ancestor_mass", "Numba::ancestor_pdg2mass(dk2nu.ancestor.pdg)")
+        .Define("ancestor_pT", "calc_pT(dk2nu.ancestor)")
+        .Define("ancestor_xF", "calc_xF(dk2nu.ancestor, ancestor_mass)")
     )
     return _definitions
 

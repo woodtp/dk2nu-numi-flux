@@ -19,6 +19,20 @@ def set_ROOT_opts() -> None:
 
 @ROOT.Numba.Declare(["int"], "double")
 def pdg_to_mass(pdg: int) -> float:
+    """
+    Get the mass of a particle given its PDG code.
+
+    Parameters
+    ----------
+    pdg : int
+        PDG code of the particle.
+
+    Returns
+    -------
+    mass : float
+        Mass of the particle in GeV.
+    """
+
     if abs(pdg) == 13:
         return 0.13957039  # muon mass
     if abs(pdg) == 15:
@@ -29,6 +43,16 @@ def pdg_to_mass(pdg: int) -> float:
         return 0.493677  # charged kaon mass
     if pdg == 311 or pdg == 130 or pdg == 310:
         return 0.497611  # K0 mass
+    if abs(pdg) == 2212:
+        return 0.938272
+    if abs(pdg) == 2112:
+        return 0.939565
+    if abs(pdg) == 3122:
+        return 1.115683
+    if abs(pdg) == 3222:
+        return 1.18937
+    if abs(pdg) == 3312:
+        return 1.32171
     return -1.0
 
 
@@ -194,3 +218,46 @@ def target_to_code(targets: np.ndarray) -> np.ndarray:
     if targets[0] == 0:
         return np.array([_codes(p) for p in targets[1:]], dtype=np.int32)
     return np.array([_codes(p) for p in targets[:-1]], dtype=np.int32)
+
+
+@ROOT.Numba.Declare(["RVec<int>"], "RVec<int>")
+def ancestor_parent_pdg(ancestor_pdg: np.ndarray) -> np.ndarray:
+    return np.append(np.array([0], dtype=np.int32), ancestor_pdg[:-2])
+
+
+@ROOT.Numba.Declare(["RVec<int>"], "RVec<double>")
+def ancestor_pdg2mass(pdg_ids: np.ndarray):
+    """ I hate this but it works.
+    """
+    def _pdg_to_mass(pdg: int) -> float:
+        if abs(pdg) == 13:
+            return 0.13957039  # muon mass
+        if abs(pdg) == 15:
+            return 1.77686  # tau mass
+        if abs(pdg) == 211:
+            return 0.13957061  # pion mass
+        if abs(pdg) == 321:
+            return 0.493677  # charged kaon mass
+        if pdg == 311 or pdg == 130 or pdg == 310:
+            return 0.497611  # K0 mass
+        if abs(pdg) == 2212:
+            return 0.938272
+        if abs(pdg) == 2112:
+            return 0.939565
+        if abs(pdg) == 3122:
+            return 1.115683
+        if abs(pdg) == 3222:
+            return 1.18937
+        if abs(pdg) == 3212:
+            return 1.92642
+        if abs(pdg) == 3112:
+            return 1.19745
+        if abs(pdg) == 3312:
+            return 1.32171
+        if abs(pdg) == 331:
+            return 0.95778
+        if abs(pdg) == 221:
+            return 0.547862
+        return -1.0
+    return np.array([_pdg_to_mass(p) for p in pdg_ids])
+

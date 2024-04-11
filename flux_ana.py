@@ -9,19 +9,22 @@ from pathlib import Path
 logging.basicConfig(level=logging.INFO, format="[%(levelname)s] %(message)s")
 
 import ROOT  # type: ignore
-import numpy as np
+# import numpy as np
 
 from root_declarations import set_ROOT_opts
 from spectra_definitions import apply_defs
 
 
+# DEBUG_MODE = True
+DEBUG_MODE = False
+
 FILE_SETS = {
     # "nominal_fhc":  "/pnfs/icarus/persistent/users/awood/g4numi_checks/FHC/false/g4numi*.root",
     # "nominal_rhc":  "/pnfs/icarus/persistent/users/awood/g4numi_checks/RHC/false/g4numi*.root",
     "g3Chase_fhc":  "/pnfs/icarus/persistent/users/awood/g4numi_checks/FHC/true/g4numi*.root",
-    # "g3Chase_rhc":  "/pnfs/icarus/persistent/users/awood/g4numi_checks/RHC/true/g4numi*.root",
-    # "g4Update_fhc": "/exp/icarus/data/users/awood/uboone_beamsim_g4.10.4/me000z200i/run0/files/g4numi*.root",
-    # "g4Update_rhc": "/exp/icarus/data/users/awood/uboone_beamsim_g4.10.4/me000z-200i/run0/files/g4numi*.root",
+    "g3Chase_rhc":  "/pnfs/icarus/persistent/users/awood/g4numi_checks/RHC/true/g4numi*.root",
+    "g4Update_fhc": "/exp/icarus/data/users/awood/uboone_beamsim_g4.10.4/me000z200i/run0/files/g4numi*.root",
+    "g4Update_rhc": "/exp/icarus/data/users/awood/uboone_beamsim_g4.10.4/me000z-200i/run0/files/g4numi*.root",
 }
 
 POT_PER_FILE = 500_000
@@ -38,6 +41,8 @@ def get_pot(files: str) -> int:
 
 def run_analysis(in_fname: str, out_fname: str, tree_name: str) -> None:
     df = ROOT.RDataFrame("dk2nuTree", in_fname)
+    if DEBUG_MODE:
+        df = df.Range(0, 1000)
 
     df = apply_defs(df, ICARUS)
 
@@ -59,7 +64,10 @@ def run_analysis(in_fname: str, out_fname: str, tree_name: str) -> None:
         "theta_p",
         "par_codes",
         "target_codes",
-    ]
+        "ancestor_parent_pdg",
+        "ancestor_pT",
+        "ancestor_xF"
+        ]
 
     tree_log_str = f"Preparing Tree '{tree_name}' with branches:\n\n"
     for branch in branches:
