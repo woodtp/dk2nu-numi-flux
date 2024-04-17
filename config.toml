@@ -1,0 +1,16 @@
+location = [450.37, 7991.98, 79512.66]  # ICARUS TPC center in NuMI coords [cm]
+# location = [0, 0, 103648.837]  # 2x2
+
+output_file = "output.root"
+
+pot_per_file = 500_000
+
+[file_sets]
+nominal_fhc = "/pnfs/icarus/persistent/users/awood/g4numi_checks/FHC/false/g4numi*.root"
+nominal_rhc = "/pnfs/icarus/persistent/users/awood/g4numi_checks/RHC/false/g4numi*.root"
+
+g3Chase_fhc = "/pnfs/icarus/persistent/users/awood/g4numi_checks/FHC/true/g4numi*.root"
+g3Chase_rhc = "/pnfs/icarus/persistent/users/awood/g4numi_checks/RHC/true/g4numi*.root"
+
+g4Update_fhc = "/exp/icarus/data/users/awood/uboone_beamsim_g4.10.4/me000z200i/run0/files/g4numi*.root"
+g4Update_rhc = "/exp/icarus/data/users/awood/uboone_beamsim_g4.10.4/me000z-200i/run0/files/g4numi*.root"
