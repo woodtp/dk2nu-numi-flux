@@ -6,4 +6,5 @@ psycopg @ file:///scratch/workspace/canvas-products/label1/swarm/label2/SLF7/bui
 psycopg2 @ file:///scratch/workspace/canvas-products/label1/swarm/label2/SLF7/build/postgresql/v15_3/src/psycopg2-2.9.6
 pycparser==2.22
 scipy==1.13.0
+toml==0.10.2
 typing_extensions==4.5.0

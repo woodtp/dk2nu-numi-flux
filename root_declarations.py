@@ -7,10 +7,12 @@ import numpy as np
 
 logging.info("jit'ing functions...")
 
-def set_ROOT_opts() -> None:
+
+def set_ROOT_opts(debug: bool = False) -> None:
     logging.info("Setting ROOT options and loading libraries")
     ROOT.gROOT.SetBatch(True)
-    ROOT.EnableImplicitMT()
+    if not debug:
+        ROOT.EnableImplicitMT()
     dk2nu_lib = os.environ["DK2NU_LIB"]
     ROOT.gSystem.Load(f"{dk2nu_lib}/libdk2nuTree.so")
     ROOT.gSystem.Load("./libWeight.so")
@@ -174,6 +176,7 @@ def theta_p(p: np.ndarray, det_loc: np.ndarray) -> float:
         theta = -theta
     return theta
 
+
 @ROOT.Numba.Declare(["RVec<int>"], "RVec<int>")
 def parent_to_code(parents: np.ndarray) -> np.ndarray:
     def codes(pdg):
@@ -199,6 +202,7 @@ def parent_to_code(parents: np.ndarray) -> np.ndarray:
             return 9
 
     return np.array([codes(p) for p in parents[:-1]], dtype=np.int32)
+
 
 @ROOT.Numba.Declare(["RVec<int>"], "RVec<int>")
 def target_to_code(targets: np.ndarray) -> np.ndarray:
@@ -227,8 +231,8 @@ def ancestor_parent_pdg(ancestor_pdg: np.ndarray) -> np.ndarray:
 
 @ROOT.Numba.Declare(["RVec<int>"], "RVec<double>")
 def ancestor_pdg2mass(pdg_ids: np.ndarray):
-    """ I hate this but it works.
-    """
+    """I hate this but it works."""
+
     def _pdg_to_mass(pdg: int) -> float:
         if abs(pdg) == 13:
             return 0.13957039  # muon mass
@@ -259,5 +263,5 @@ def ancestor_pdg2mass(pdg_ids: np.ndarray):
         if abs(pdg) == 221:
             return 0.547862
         return -1.0
-    return np.array([_pdg_to_mass(p) for p in pdg_ids])
 
+    return np.array([_pdg_to_mass(p) for p in pdg_ids])
