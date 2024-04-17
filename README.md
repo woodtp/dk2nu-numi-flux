@@ -12,7 +12,7 @@ $ ./flux_ana.py  # Run the code
 ```
 
 ### Usage
-```sh
+```
 usage: flux_ana.py [-h] [-c CONFIG] [-f] [-d]
 
 Reads Dk2Nu format, calculates weights for the input position, and writes a
