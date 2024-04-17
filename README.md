@@ -11,6 +11,21 @@ $ . setup.sh  # Setup the environment, have to source instead of execute if on a
 $ ./flux_ana.py  # Run the code
 ```
 
+### Usage
+```sh
+usage: flux_ana.py [-h] [-c CONFIG] [-f] [-d]
+
+Reads Dk2Nu format, calculates weights for the input position, and writes a
+tree to a new ROOT file.
+
+optional arguments:
+  -h, --help            show this help message and exit
+  -c CONFIG, --config CONFIG
+                        path to configuration file
+  -f, --overwrite       overwrite output file if it exists
+  -d, --debug           run in debug mode
+```
+
 ## Configuration File
 
 ```toml
