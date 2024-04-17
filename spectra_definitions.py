@@ -2,6 +2,9 @@ import ROOT  # type: ignore
 
 
 def apply_defs(df: ROOT.RDataFrame, det_loc: list[float]) -> ROOT.RDataFrame:
+    if len(det_loc) != 3:
+        raise ValueError("Detector location must be a list of 3 floats!")
+
     _definitions = (
         df.Alias("nu_pdg", "dk2nu.decay.ntype")
         .Alias("parent_pdg", "dk2nu.decay.ptype")
@@ -11,7 +14,10 @@ def apply_defs(df: ROOT.RDataFrame, det_loc: list[float]) -> ROOT.RDataFrame:
         .Alias("pdpx", "dk2nu.decay.pdpx")
         .Alias("pdpy", "dk2nu.decay.pdpy")
         .Alias("pdpz", "dk2nu.decay.pdpz")
-        .Define("det_loc", f"ROOT::RVec<double>{{ {det_loc[0]}, {det_loc[1]}, {det_loc[2]} }}")
+        .Define(
+            "det_loc",
+            f"ROOT::RVec<double>{{ {det_loc[0]}, {det_loc[1]}, {det_loc[2]} }}",
+        )
         .Define(
             "decay_vertex",
             "ROOT::RVec<double>{vx, vy, vz}",
