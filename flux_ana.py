@@ -55,8 +55,10 @@ def run_analysis(
         "par_codes",
         "target_codes",
         "ancestor_parent_pdg",
+        "ancestor_parent_mom",
         "ancestor_pT",
         "ancestor_xF",
+        "ancestor_vol",
     ]
 
     tree_log_str = f"Preparing Tree '{tree_name}' with branches:\n\n"
