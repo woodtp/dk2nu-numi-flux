@@ -57,6 +57,10 @@ def pdg_to_mass(pdg: int) -> float:
         return 1.32171
     return -1.0
 
+@ROOT.Numba.Declare(["RVec<double>", "RVec<double>", "RVec<double>"], "RVec<double>")
+def calc_magnitudes(vx: np.ndarray, vy: np.ndarray, vz: np.ndarray) -> np.ndarray:
+    return np.sqrt(vx**2 + vy**2 + vz**2)
+
 
 @ROOT.Numba.Declare(["RVec<double>", "double"], "double")
 def calc_energy(p: np.ndarray, mass: float) -> float:
@@ -233,7 +237,7 @@ def ancestor_parent_pdg(ancestor_pdg: np.ndarray) -> np.ndarray:
 def ancestor_pdg2mass(pdg_ids: np.ndarray):
     """I hate this but it works."""
 
-    def _pdg_to_mass(pdg: int) -> float:
+    def _pdg_to_mass(pdg):
         if abs(pdg) == 13:
             return 0.13957039  # muon mass
         if abs(pdg) == 15:
@@ -264,4 +268,4 @@ def ancestor_pdg2mass(pdg_ids: np.ndarray):
             return 0.547862
         return -1.0
 
-    return np.array([_pdg_to_mass(p) for p in pdg_ids])
+    return np.array([_pdg_to_mass(p) for p in pdg_ids], dtype=np.float64)
