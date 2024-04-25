@@ -1,5 +1,7 @@
 source /cvmfs/icarus.opensciencegrid.org/products/icarus/setup_icarus.sh
 
+git submodule update --init
+
 export DK2NU=$PWD/dk2nu
 export DK2NU_INC=$DK2NU/tree
 export DK2NU_LIB=$DK2NU/build/lib
