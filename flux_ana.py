@@ -30,7 +30,7 @@ def run_analysis(
 ) -> None:
     df = ROOT.RDataFrame("dk2nuTree", in_fname)
     if debug:
-        df = df.Range(0, 1000)
+        df = df.Range(0, 10000)
 
     logging.debug(f"Loaded {in_fname}. Applying definitions...")
     logging.debug(f"Location: {location}")
@@ -73,6 +73,8 @@ def run_analysis(
 
     opts = ROOT.RDF.RSnapshotOptions()
     opts.fMode = "UPDATE"
+    # opts.fCompressionAlgorithm = ROOT.kLZMA
+    # opts.fCompressionLevel = 9
 
     df.Snapshot(tree_name, out_fname, branches, opts)  # type: ignore
 
@@ -91,6 +93,7 @@ def main() -> None:
         help="overwrite output file if it exists",
         action="store_true",
     )
+    parser.add_argument("--mt", help="use multithreading", action="store_true")
     parser.add_argument("-d", "--debug", action="store_true", help="run in debug mode")
 
     if len(sys.argv) == 1:
@@ -125,7 +128,11 @@ def main() -> None:
         logging.info(f"Overwriting {out_fname}")
         out_fname.unlink()
 
-    set_ROOT_opts(args.debug)
+    if args.debug and args.mt:
+        logging.warning("Debug mode and multithreading are not compatible. Disabling multithreading.")
+        args.mt = False
+
+    set_ROOT_opts(args.mt)
 
     for name, files in cfg["file_sets"].items():
         tree_name = f"fluxTree_{name}"

@@ -8,10 +8,9 @@ import numpy as np
 logging.info("jit'ing functions...")
 
 
-def set_ROOT_opts(debug: bool = False) -> None:
+def set_ROOT_opts(mt: bool = False) -> None:
     logging.info("Setting ROOT options and loading libraries")
-    ROOT.gROOT.SetBatch(True)
-    if not debug:
+    if mt:
         ROOT.EnableImplicitMT()
     dk2nu_lib = os.environ["DK2NU_LIB"]
     ROOT.gSystem.Load(f"{dk2nu_lib}/libdk2nuTree.so")
