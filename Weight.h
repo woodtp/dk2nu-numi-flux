@@ -4,6 +4,7 @@
 
 
 std::vector<std::string> get_volumes(const ROOT::RVec<bsim::Ancestor>& ancestors);
+std::vector<double> get_incident_momenta(const ROOT::RVec<bsim::Ancestor>& ancestors);
 std::vector<double> calc_pT(const ROOT::RVec<bsim::Ancestor>&);
 std::vector<double> calc_xF(const ROOT::RVec<bsim::Ancestor>&, const ROOT::RVec<double>&);
 double calc_weight(const bsim::Decay& decay,

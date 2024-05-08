@@ -14,6 +14,7 @@ def apply_defs(df: ROOT.RDataFrame, det_loc: list[float]) -> ROOT.RDataFrame:
         .Alias("pdpx", "dk2nu.decay.pdpx")
         .Alias("pdpy", "dk2nu.decay.pdpy")
         .Alias("pdpz", "dk2nu.decay.pdpz")
+        # .Define("is_new_g4", 'dk2nu.ancestor[0].proc == "BeamParticle"')
         .Define("ancestor_vol", "get_volumes(dk2nu.ancestor)")
         .Define(
             "det_loc",
@@ -44,7 +45,8 @@ def apply_defs(df: ROOT.RDataFrame, det_loc: list[float]) -> ROOT.RDataFrame:
         .Define("par_codes", "Numba::parent_to_code(dk2nu.ancestor.pdg)")
         .Define("target_codes", "Numba::target_to_code(dk2nu.ancestor.nucleus)")
         .Define("ancestor_parent_pdg", "Numba::ancestor_parent_pdg(dk2nu.ancestor.pdg)")
-        .Define("ancestor_parent_mom", "Numba::calc_magnitudes(dk2nu.ancestor.pprodpx, dk2nu.ancestor.pprodpy, dk2nu.ancestor.pprodpz)")
+        # .Define("ancestor_parent_mom", "Numba::calc_magnitudes(dk2nu.ancestor.pprodpx, dk2nu.ancestor.pprodpy, dk2nu.ancestor.pprodpz)")
+        .Define("ancestor_parent_mom", "get_incident_momenta(dk2nu.ancestor)")
         .Define("ancestor_mass", "Numba::ancestor_pdg2mass(dk2nu.ancestor.pdg)")
         .Define("ancestor_pT", "calc_pT(dk2nu.ancestor)")
         .Define("ancestor_xF", "calc_xF(dk2nu.ancestor, ancestor_mass)")

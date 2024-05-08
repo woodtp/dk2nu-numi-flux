@@ -1,6 +1,5 @@
 #include "Weight.h"
 
-
 static constexpr double DEFAULT_DOUBLE = -9999.0;
 
 static double clip(const double val)
@@ -26,9 +25,31 @@ std::vector<std::string> get_volumes(const ROOT::RVec<bsim::Ancestor>& ancestors
   return vol;
 }
 
+std::vector<double> get_incident_momenta(const ROOT::RVec<bsim::Ancestor>& ancestors)
+{
+  std::vector<double> p_inc;
+  p_inc.reserve(ancestors.size() - 1);
+  const bool is_old_g4 = ancestors[0].proc == "Primary";
+  for (std::size_t i = 0; i < ancestors.size() - 1; ++i) {
+    if (i == 0 || !is_old_g4)
+    {
+      p_inc.emplace_back(std::sqrt(ancestors[i].pprodpx * ancestors[i].pprodpx +
+                                   ancestors[i].pprodpy * ancestors[i].pprodpy +
+                                   ancestors[i].pprodpz * ancestors[i].pprodpz));
+    } else {
+      p_inc.emplace_back(std::sqrt(ancestors[i-1].pprodpx * ancestors[i-1].pprodpx +
+                                   ancestors[i-1].pprodpy * ancestors[i-1].pprodpy +
+                                   ancestors[i-1].pprodpz * ancestors[i-1].pprodpz));
+    }
+  }
+  return p_inc;
+}
+
 std::vector<double> calc_pT(const ROOT::RVec<bsim::Ancestor>& ancestors)
 {
   std::vector<double> pT(ancestors.size() - 1, DEFAULT_DOUBLE);
+
+  const bool is_old_g4 = ancestors[0].proc == "Primary";
 
   for (std::size_t i = 0; i < ancestors.size() - 1; ++i) {
     if (skip_particle(ancestors[i])) { continue; }
@@ -37,12 +58,17 @@ std::vector<double> calc_pT(const ROOT::RVec<bsim::Ancestor>& ancestors)
 
     auto const p_prod = std::sqrt(prod.startpx * prod.startpx + prod.startpy * prod.startpy +
                                   prod.startpz * prod.startpz);
-    auto const p_inc = std::sqrt(prod.pprodpx * prod.pprodpx + prod.pprodpy * prod.pprodpy +
-                                 prod.pprodpz * prod.pprodpz);
 
-    const double costh = clip(
-      (prod.startpx * prod.pprodpx + prod.startpy * prod.pprodpy + prod.startpz * prod.pprodpz) /
-      (p_prod * p_inc));
+    const double pprodpx = is_old_g4 ? ancestors[i - 1].pprodpx : prod.pprodpx;
+    const double pprodpy = is_old_g4 ? ancestors[i - 1].pprodpy : prod.pprodpy;
+    const double pprodpz = is_old_g4 ? ancestors[i - 1].pprodpz : prod.pprodpz;
+
+    const double p_inc =
+      std::sqrt(pprodpx * pprodpx + pprodpy * pprodpy + pprodpz * pprodpz); // [GeV/c]
+
+    const double costh =
+      clip((prod.startpx * pprodpx + prod.startpy * pprodpy + prod.startpz * pprodpz) /
+           (p_prod * p_inc));
 
     const double sinth = std::sqrt(1. - costh * costh);
 
@@ -61,6 +87,8 @@ std::vector<double> calc_xF(const ROOT::RVec<bsim::Ancestor>& ancestors,
   constexpr double nucleon_mass = 0.93891875433; // [GeV]
   constexpr double nucleon_mass2 = nucleon_mass * nucleon_mass;
 
+  const bool is_old_g4 = ancestors[0].proc == "Primary";
+
   for (std::size_t i = 0; i < ancestors.size() - 1; ++i) {
     if (skip_particle(ancestors[i])) { continue; }
 
@@ -72,12 +100,17 @@ std::vector<double> calc_xF(const ROOT::RVec<bsim::Ancestor>& ancestors,
 
     auto const p_prod = std::sqrt(prod.startpx * prod.startpx + prod.startpy * prod.startpy +
                                   prod.startpz * prod.startpz); // [GeV/c]
-    auto const p_inc = std::sqrt(prod.pprodpx * prod.pprodpx + prod.pprodpy * prod.pprodpy +
-                                 prod.pprodpz * prod.pprodpz); // [GeV/c]
 
-    const double costh = clip(
-      (prod.startpx * prod.pprodpx + prod.startpy * prod.pprodpy + prod.startpz * prod.pprodpz) /
-      (p_prod * p_inc));
+    const double pprodpx = is_old_g4 ? ancestors[i - 1].pprodpx : prod.pprodpx;
+    const double pprodpy = is_old_g4 ? ancestors[i - 1].pprodpy : prod.pprodpy;
+    const double pprodpz = is_old_g4 ? ancestors[i - 1].pprodpz : prod.pprodpz;
+
+    const double p_inc =
+      std::sqrt(pprodpx * pprodpx + pprodpy * pprodpy + pprodpz * pprodpz); // [GeV/c]
+
+    const double costh =
+      clip((prod.startpx * pprodpx + prod.startpy * pprodpy + prod.startpz * pprodpz) /
+           (p_prod * p_inc));
 
     // Calculate the produced particle's longitudinal momentum in the lab frame
     const double pz = p_prod * costh;
