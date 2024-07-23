@@ -56,6 +56,8 @@ def run_analysis(
         "target_codes",
         "ancestor_parent_pdg",
         "ancestor_parent_mom",
+        "ancestor_produced_mom",
+        "ancestor_produced_theta",
         "ancestor_pT",
         "ancestor_xF",
         "ancestor_vol",
@@ -108,10 +110,11 @@ def main() -> None:
 
     cfg = toml.load(args.config)
 
-    loc = cfg["location"]
+    loc: list[float] = [float(x) for x in cfg["location"]]
     if len(loc) != 3:
         logging.error(f"Invalid location format: {loc}. Please provide '[x, y, z]'. Exiting...")
         sys.exit(1)
+    logging.info(f"Going to calculate weights for location: {loc}")
 
     from root_declarations import set_ROOT_opts
 
