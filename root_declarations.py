@@ -11,7 +11,7 @@ logging.info("jit'ing functions...")
 def set_ROOT_opts(mt: bool = False) -> None:
     logging.info("Setting ROOT options and loading libraries")
     if mt:
-        ROOT.EnableImplicitMT()
+        ROOT.EnableImplicitMT(20)
     dk2nu_lib = os.environ["DK2NU_LIB"]
     ROOT.gSystem.Load(f"{dk2nu_lib}/libdk2nuTree.so")
     ROOT.gSystem.Load("./libWeight.so")
@@ -145,6 +145,7 @@ def theta_p(p: np.ndarray, det_loc: np.ndarray) -> float:
     """
     Calculate the angle (in degrees) between a momentum vector and NuMI within the plane
     connecting the detector location and the NuMI axis.
+    If the provided location is colinear with the beam axis, the angle is calculated with respect to the x-z plane.
 
     Parameters
     ----------
@@ -162,6 +163,9 @@ def theta_p(p: np.ndarray, det_loc: np.ndarray) -> float:
     numi_axis = np.array([0, 0, 1.0])
 
     n = np.cross(det_loc, numi_axis)
+
+    if not n.any():
+        n = np.array([0, 1.0, 0])
 
     # computing dot product manually to suppress warnings about
     # the input RVecD not being in contiguous memory.
