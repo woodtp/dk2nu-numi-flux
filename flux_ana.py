@@ -30,7 +30,7 @@ def run_analysis(
 ) -> None:
     df = ROOT.RDataFrame("dk2nuTree", in_fname)
     if debug:
-        df = df.Range(0, 1000)
+        df = df.Range(0, 10000)
 
     logging.debug(f"Loaded {in_fname}. Applying definitions...")
     logging.debug(f"Location: {location}")
@@ -55,8 +55,12 @@ def run_analysis(
         "par_codes",
         "target_codes",
         "ancestor_parent_pdg",
+        "ancestor_parent_mom",
+        "ancestor_produced_mom",
+        "ancestor_produced_theta",
         "ancestor_pT",
         "ancestor_xF",
+        "ancestor_vol",
     ]
 
     tree_log_str = f"Preparing Tree '{tree_name}' with branches:\n\n"
@@ -71,6 +75,8 @@ def run_analysis(
 
     opts = ROOT.RDF.RSnapshotOptions()
     opts.fMode = "UPDATE"
+    # opts.fCompressionAlgorithm = ROOT.kLZMA
+    # opts.fCompressionLevel = 9
 
     df.Snapshot(tree_name, out_fname, branches, opts)  # type: ignore
 
@@ -89,6 +95,7 @@ def main() -> None:
         help="overwrite output file if it exists",
         action="store_true",
     )
+    parser.add_argument("--mt", help="use multithreading", action="store_true")
     parser.add_argument("-d", "--debug", action="store_true", help="run in debug mode")
 
     if len(sys.argv) == 1:
@@ -103,10 +110,11 @@ def main() -> None:
 
     cfg = toml.load(args.config)
 
-    loc = cfg["location"]
+    loc: list[float] = [float(x) for x in cfg["location"]]
     if len(loc) != 3:
         logging.error(f"Invalid location format: {loc}. Please provide '[x, y, z]'. Exiting...")
         sys.exit(1)
+    logging.info(f"Going to calculate weights for location: {loc}")
 
     from root_declarations import set_ROOT_opts
 
@@ -123,7 +131,11 @@ def main() -> None:
         logging.info(f"Overwriting {out_fname}")
         out_fname.unlink()
 
-    set_ROOT_opts(args.debug)
+    if args.debug and args.mt:
+        logging.warning("Debug mode and multithreading are not compatible. Disabling multithreading.")
+        args.mt = False
+
+    set_ROOT_opts(args.mt)
 
     for name, files in cfg["file_sets"].items():
         tree_name = f"fluxTree_{name}"

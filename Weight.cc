@@ -1,33 +1,104 @@
 #include "Weight.h"
 
-std::vector<double> calc_pT(const ROOT::RVec<bsim::Ancestor>& ancestors)
+static constexpr double DEFAULT_DOUBLE = -9999.0;
+
+static double clip(const double val)
 {
-  std::vector<double> pT(ancestors.size() - 1);
+  // clip value to [-1, 1]
+  return std::max(-1.0, std::min(1.0, val));
+}
+
+static bool skip_particle(const bsim::Ancestor& ancestor)
+{
+  // if the beam proton or decay process, skip
+  // this should cover differences between Geant4-9 (Primary) and Geant4-10 (BeamParticle)
+  return ancestor.proc == "Primary" || ancestor.proc == "BeamParticle" || ancestor.proc == "Decay";
+}
+
+std::vector<std::string> get_volumes(const ROOT::RVec<bsim::Ancestor>& ancestors)
+{
+  std::vector<std::string> vol;
+  vol.reserve(ancestors.size() - 1);
+  for (std::size_t i = 0; i < ancestors.size() - 1; ++i) {
+    vol.emplace_back(ancestors[i].ivol);
+  }
+  return vol;
+}
+
+std::vector<double> get_incident_momenta(const ROOT::RVec<bsim::Ancestor>& ancestors)
+{
+  std::vector<double> p_inc;
+  p_inc.reserve(ancestors.size() - 1);
+  const bool is_old_g4 = ancestors[0].proc == "Primary";
+  for (std::size_t i = 0; i < ancestors.size() - 1; ++i) {
+    const bsim::Ancestor& part = i == 0 || !is_old_g4 ? ancestors[i] : ancestors[i - 1];
+    p_inc.push_back(std::sqrt(part.pprodpx * part.pprodpx
+                            + part.pprodpy * part.pprodpy
+                            + part.pprodpz * part.pprodpz));
+  }
+  return p_inc;
+}
+
+std::vector<double> get_produced_momenta(const ROOT::RVec<bsim::Ancestor>& ancestors)
+{
+  std::vector<double> p_prod;
+  p_prod.reserve(ancestors.size() - 1);
+  for (std::size_t i = 0; i < ancestors.size() - 1; ++i) {
+      p_prod.push_back(std::sqrt(ancestors[i].startpx * ancestors[i].startpx
+                               + ancestors[i].startpy * ancestors[i].startpy
+                               + ancestors[i].startpz * ancestors[i].startpz));
+  }
+  return p_prod;
+}
+
+std::vector<double> calc_theta(const ROOT::RVec<bsim::Ancestor>& ancestors)
+{
+  std::vector<double> thetas(ancestors.size() - 1, DEFAULT_DOUBLE);
+
+  const bool is_old_g4 = ancestors[0].proc == "Primary";
 
   for (std::size_t i = 0; i < ancestors.size() - 1; ++i) {
-    if (i == 0) {
-      pT[i] = -9999.;
-      continue;
-    }
-    else if (ancestors[i - 1].nucleus == 0 || ancestors[i].nucleus == 1000000000) {
-      pT[i] = -9999.;
-      continue;
-    }
+    if (skip_particle(ancestors[i])) { continue; }
+
+    auto const& prod = ancestors[i];
+
+    const double pprodpx = is_old_g4 ? ancestors[i - 1].pprodpx : prod.pprodpx;
+    const double pprodpy = is_old_g4 ? ancestors[i - 1].pprodpy : prod.pprodpy;
+    const double pprodpz = is_old_g4 ? ancestors[i - 1].pprodpz : prod.pprodpz;
+
+    const double p_prod = std::sqrt(prod.startpx * prod.startpx + prod.startpy * prod.startpy + prod.startpz * prod.startpz); // [GeV/c]
+
+    const double p_inc = std::sqrt(pprodpx * pprodpx + pprodpy * pprodpy + pprodpz * pprodpz); // [GeV/c]
+
+    const double costh = clip((prod.startpx * pprodpx + prod.startpy * pprodpy + prod.startpz * pprodpz) / (p_prod * p_inc));
+
+    thetas[i] = std::acos(costh);
+  }
+
+  return thetas;
+}
+
+std::vector<double> calc_pT(const ROOT::RVec<bsim::Ancestor>& ancestors)
+{
+  std::vector<double> pT(ancestors.size() - 1, DEFAULT_DOUBLE);
+
+  const bool is_old_g4 = ancestors[0].proc == "Primary";
+
+  for (std::size_t i = 0; i < ancestors.size() - 1; ++i) {
+    if (skip_particle(ancestors[i])) { continue; }
+
     auto const& prod = ancestors[i];
 
     auto const p_prod = std::sqrt(prod.startpx * prod.startpx + prod.startpy * prod.startpy +
                                   prod.startpz * prod.startpz);
-    auto const p_inc = std::sqrt(prod.pprodpx * prod.pprodpx + prod.pprodpy * prod.pprodpy +
-                                 prod.pprodpz * prod.pprodpz);
 
-    double costh =
-      (prod.startpx * prod.pprodpx + prod.startpy * prod.pprodpy + prod.startpz * prod.pprodpz) /
-      (p_prod * p_inc);
+    const double pprodpx = is_old_g4 ? ancestors[i - 1].pprodpx : prod.pprodpx;
+    const double pprodpy = is_old_g4 ? ancestors[i - 1].pprodpy : prod.pprodpy;
+    const double pprodpz = is_old_g4 ? ancestors[i - 1].pprodpz : prod.pprodpz;
 
-    if (costh > 1.)
-      costh = 1.;
-    else if (costh < -1.)
-      costh = -1.;
+    const double p_inc = std::sqrt(pprodpx * pprodpx + pprodpy * pprodpy + pprodpz * pprodpz); // [GeV/c]
+
+    const double costh = clip((prod.startpx * pprodpx + prod.startpy * pprodpy + prod.startpz * pprodpz) / (p_prod * p_inc));
 
     const double sinth = std::sqrt(1. - costh * costh);
 
@@ -40,30 +111,17 @@ std::vector<double> calc_pT(const ROOT::RVec<bsim::Ancestor>& ancestors)
 std::vector<double> calc_xF(const ROOT::RVec<bsim::Ancestor>& ancestors,
                             const ROOT::RVec<double>& ancestor_masses)
 {
-  std::vector<double> xF(ancestors.size() - 1);
+  std::vector<double> xF(ancestors.size() - 1, DEFAULT_DOUBLE);
 
   // Assume the nuclear target mass to be an average between proton and neutron
   constexpr double nucleon_mass = 0.93891875433; // [GeV]
   constexpr double nucleon_mass2 = nucleon_mass * nucleon_mass;
 
+  const bool is_old_g4 = ancestors[0].proc == "Primary";
+
   for (std::size_t i = 0; i < ancestors.size() - 1; ++i) {
-    if (i == 0) {
-      // if proton, skip
-      xF[i] = -9999.;
-      continue;
-    }
-    else if (ancestors[i - 1].nucleus == 0 || ancestors[i].nucleus == 1000000000) {
-      // if decay process, skip
-      // The two conditions should cover differences between Geant4-9 and Geant4-10
-      xF[i] = -9999.;
-      continue;
-    }
-    // else if (ancestors[i].pdg == ancestors[i-1].pdg) {
-    //   // elastic scatter?
-    //   xF[i] = -9999.;
-    //   continue;
-    // }
-    // auto const &inc = ancestors[i - 1];
+    if (skip_particle(ancestors[i])) { continue; }
+
     auto const& prod = ancestors[i];
 
     const double mass_inc = ancestor_masses[i - 1];
@@ -72,17 +130,17 @@ std::vector<double> calc_xF(const ROOT::RVec<bsim::Ancestor>& ancestors,
 
     auto const p_prod = std::sqrt(prod.startpx * prod.startpx + prod.startpy * prod.startpy +
                                   prod.startpz * prod.startpz); // [GeV/c]
-    auto const p_inc = std::sqrt(prod.pprodpx * prod.pprodpx + prod.pprodpy * prod.pprodpy +
-                                 prod.pprodpz * prod.pprodpz); // [GeV/c]
 
-    double costh =
-      (prod.startpx * prod.pprodpx + prod.startpy * prod.pprodpy + prod.startpz * prod.pprodpz) /
-      (p_prod * p_inc);
+    const double pprodpx = is_old_g4 ? ancestors[i - 1].pprodpx : prod.pprodpx;
+    const double pprodpy = is_old_g4 ? ancestors[i - 1].pprodpy : prod.pprodpy;
+    const double pprodpz = is_old_g4 ? ancestors[i - 1].pprodpz : prod.pprodpz;
 
-    if (costh > 1.)
-      costh = 1.;
-    else if (costh < -1.)
-      costh = -1.;
+    const double p_inc =
+      std::sqrt(pprodpx * pprodpx + pprodpy * pprodpy + pprodpz * pprodpz); // [GeV/c]
+
+    const double costh =
+      clip((prod.startpx * pprodpx + prod.startpy * pprodpy + prod.startpz * pprodpz) /
+           (p_prod * p_inc));
 
     // Calculate the produced particle's longitudinal momentum in the lab frame
     const double pz = p_prod * costh;
@@ -164,14 +222,9 @@ double calc_weight(const bsim::Decay& decay,
   //it can be 0 if mupar..=0. (I guess muons created in target??)
   if (p_pcm_mp[3] != 0.) {
     //calc new decay angle w.r.t. (anti)spin direction
-    double costh =
-      (p_dcm_nu[0] * p_pcm_mp[0] + p_dcm_nu[1] * p_pcm_mp[1] + p_dcm_nu[2] * p_pcm_mp[2]) /
-      (p_dcm_nu[3] * p_pcm_mp[3]);
-
-    if (costh > 1.)
-      costh = 1.;
-    else if (costh < -1.)
-      costh = -1.;
+    const double costh =
+      clip((p_dcm_nu[0] * p_pcm_mp[0] + p_dcm_nu[1] * p_pcm_mp[1] + p_dcm_nu[2] * p_pcm_mp[2]) /
+           (p_dcm_nu[3] * p_pcm_mp[3]));
 
     //calc relative weight due to angle difference
     auto const nu_type = decay.ntype;
