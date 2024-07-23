@@ -31,18 +31,51 @@ std::vector<double> get_incident_momenta(const ROOT::RVec<bsim::Ancestor>& ances
   p_inc.reserve(ancestors.size() - 1);
   const bool is_old_g4 = ancestors[0].proc == "Primary";
   for (std::size_t i = 0; i < ancestors.size() - 1; ++i) {
-    if (i == 0 || !is_old_g4)
-    {
-      p_inc.emplace_back(std::sqrt(ancestors[i].pprodpx * ancestors[i].pprodpx +
-                                   ancestors[i].pprodpy * ancestors[i].pprodpy +
-                                   ancestors[i].pprodpz * ancestors[i].pprodpz));
-    } else {
-      p_inc.emplace_back(std::sqrt(ancestors[i-1].pprodpx * ancestors[i-1].pprodpx +
-                                   ancestors[i-1].pprodpy * ancestors[i-1].pprodpy +
-                                   ancestors[i-1].pprodpz * ancestors[i-1].pprodpz));
-    }
+    const bsim::Ancestor& part = i == 0 || !is_old_g4 ? ancestors[i] : ancestors[i - 1];
+    p_inc.push_back(std::sqrt(part.pprodpx * part.pprodpx
+                            + part.pprodpy * part.pprodpy
+                            + part.pprodpz * part.pprodpz));
   }
   return p_inc;
+}
+
+std::vector<double> get_produced_momenta(const ROOT::RVec<bsim::Ancestor>& ancestors)
+{
+  std::vector<double> p_prod;
+  p_prod.reserve(ancestors.size() - 1);
+  for (std::size_t i = 0; i < ancestors.size() - 1; ++i) {
+      p_prod.push_back(std::sqrt(ancestors[i].startpx * ancestors[i].startpx
+                               + ancestors[i].startpy * ancestors[i].startpy
+                               + ancestors[i].startpz * ancestors[i].startpz));
+  }
+  return p_prod;
+}
+
+std::vector<double> calc_theta(const ROOT::RVec<bsim::Ancestor>& ancestors)
+{
+  std::vector<double> thetas(ancestors.size() - 1, DEFAULT_DOUBLE);
+
+  const bool is_old_g4 = ancestors[0].proc == "Primary";
+
+  for (std::size_t i = 0; i < ancestors.size() - 1; ++i) {
+    if (skip_particle(ancestors[i])) { continue; }
+
+    auto const& prod = ancestors[i];
+
+    const double pprodpx = is_old_g4 ? ancestors[i - 1].pprodpx : prod.pprodpx;
+    const double pprodpy = is_old_g4 ? ancestors[i - 1].pprodpy : prod.pprodpy;
+    const double pprodpz = is_old_g4 ? ancestors[i - 1].pprodpz : prod.pprodpz;
+
+    const double p_prod = std::sqrt(prod.startpx * prod.startpx + prod.startpy * prod.startpy + prod.startpz * prod.startpz); // [GeV/c]
+
+    const double p_inc = std::sqrt(pprodpx * pprodpx + pprodpy * pprodpy + pprodpz * pprodpz); // [GeV/c]
+
+    const double costh = clip((prod.startpx * pprodpx + prod.startpy * pprodpy + prod.startpz * pprodpz) / (p_prod * p_inc));
+
+    thetas[i] = std::acos(costh);
+  }
+
+  return thetas;
 }
 
 std::vector<double> calc_pT(const ROOT::RVec<bsim::Ancestor>& ancestors)
@@ -63,12 +96,9 @@ std::vector<double> calc_pT(const ROOT::RVec<bsim::Ancestor>& ancestors)
     const double pprodpy = is_old_g4 ? ancestors[i - 1].pprodpy : prod.pprodpy;
     const double pprodpz = is_old_g4 ? ancestors[i - 1].pprodpz : prod.pprodpz;
 
-    const double p_inc =
-      std::sqrt(pprodpx * pprodpx + pprodpy * pprodpy + pprodpz * pprodpz); // [GeV/c]
+    const double p_inc = std::sqrt(pprodpx * pprodpx + pprodpy * pprodpy + pprodpz * pprodpz); // [GeV/c]
 
-    const double costh =
-      clip((prod.startpx * pprodpx + prod.startpy * pprodpy + prod.startpz * pprodpz) /
-           (p_prod * p_inc));
+    const double costh = clip((prod.startpx * pprodpx + prod.startpy * pprodpy + prod.startpz * pprodpz) / (p_prod * p_inc));
 
     const double sinth = std::sqrt(1. - costh * costh);
 
