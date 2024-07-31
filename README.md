@@ -1,5 +1,5 @@
 # Simple Dk2Nu Reader
-The purpose of this project is to read [G4NuMI](https://cdcvs.fnal.gov/redmine/projects/g4numi/wiki) flux files in the Dk2Nu format, calculate the weights for the input position, and write a tree to a new ROOT file.
+The purpose of this project is to read [G4NuMI](https://cdcvs.fnal.gov/redmine/projects/numi-beam-sim/wiki) flux files in the Dk2Nu format, calculate the weights for the input position, and write a tree to a new ROOT file.
 Output branches are defined in `spectra_definitions.py`, and the following are the default branches in the output file:
 ```
 nu_pdg                     -- Neutrino PDG code
