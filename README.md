@@ -54,8 +54,9 @@ tree to a new ROOT file.
 optional arguments:
   -h, --help            show this help message and exit
   -c CONFIG, --config CONFIG
-                        path to configuration file, default is `config.toml` in the current directory
-  -f, --overwrite       overwrite output file if it exists
+                        Path to configuration file. If unspecified, defaults to the `config.toml` in the current directory.
+  -f, --overwrite       Overwrite output file if it exists
+  --mt                  Use multithreading
   -d, --debug           run in debug mode
 ```
 
