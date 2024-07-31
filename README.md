@@ -100,5 +100,5 @@ nominal = "/path/to/files/*.root"   # Path to flux files in Dk2Nu format
 # References
 - [G4NuMI](https://cdcvs.fnal.gov/redmine/projects/numi-beam-sim/wiki)
 - [Dk2Nu](https://github.com/NuSoftHEP/dk2nu)
-- [ROOT](https://root.cern/install/) >=v6
-- [VDT](https://github.com/dpiparo/vdt) >=v04.4
+- [ROOT](https://root.cern/install/)
+- [VDT](https://github.com/dpiparo/vdt)
