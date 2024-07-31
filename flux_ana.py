@@ -26,7 +26,6 @@ def run_analysis(
     out_fname: str,
     tree_name: str,
     location: list[float],
-    mt: bool,
     debug: bool = False,
 ) -> None:
     df = ROOT.RDataFrame("dk2nuTree", in_fname)  # type: ignore
@@ -34,9 +33,12 @@ def run_analysis(
         df = df.Range(0, 10000)
 
     root_version = ROOT.__version__  # type: ignore
-    _, minor, _ = map(int, root_version.split("."))  # major, minor, patch
+    minor = root_version.split(".")[1]  # major, minor, patch
 
-    if not mt or minor >= 30:
+    if "/" in minor:
+        minor = minor.split("/")[0]
+
+    if int(minor) >= 30:
         ROOT.RDF.Experimental.AddProgressBar(df)  # type: ignore
 
     logging.debug(f"Loaded {in_fname}. Applying definitions...")
@@ -157,7 +159,7 @@ def main() -> None:
     for name, files in cfg["file_sets"].items():
         tree_name = f"fluxTree_{name}"
         run_analysis(
-            files, str(out_fname), tree_name, cfg["location"], args.mt, debug=args.debug
+            files, str(out_fname), tree_name, cfg["location"], debug=args.debug
         )
 
     for name, files in cfg["file_sets"].items():
