@@ -1,11 +1,9 @@
-import os
 import logging
-from pathlib import Path
 import sys
+from pathlib import Path
 
-import ROOT
 import numpy as np
-
+import ROOT
 
 logging.info("jit'ing functions...")
 
@@ -62,6 +60,7 @@ def pdg_to_mass(pdg: int) -> float:
     if abs(pdg) == 3312:
         return 1.32171
     return -1.0
+
 
 @ROOT.Numba.Declare(["RVec<double>", "RVec<double>", "RVec<double>"], "RVec<double>")
 def calc_magnitudes(vx: np.ndarray, vy: np.ndarray, vz: np.ndarray) -> np.ndarray:

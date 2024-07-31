@@ -88,7 +88,12 @@ def load_file(fname: str) -> ROOT.RDataFrame:
 def main() -> None:
     desc = "Reads Dk2Nu format, calculates weights for the input position, and writes a tree to a new ROOT file."
     parser = argparse.ArgumentParser(description=desc)
-    parser.add_argument("-c", "--config", help="Path to configuration file. If unspecified, defaults to the `config.toml` in the current directory.", default="config.toml")
+    parser.add_argument(
+        "-c",
+        "--config",
+        help="Path to configuration file. If unspecified, defaults to the `config.toml` in the current directory.",
+        default="config.toml",
+    )
     parser.add_argument(
         "-f",
         "--overwrite",
@@ -113,7 +118,9 @@ def main() -> None:
 
     loc: list[float] = [float(x) for x in cfg["location"]]
     if len(loc) != 3:
-        logging.error(f"Invalid location format: {loc}. Please provide '[x, y, z]'. Exiting...")
+        logging.error(
+            f"Invalid location format: {loc}. Please provide '[x, y, z]'. Exiting..."
+        )
         sys.exit(1)
     logging.info(f"Going to calculate weights for location: {loc}")
 
@@ -133,7 +140,9 @@ def main() -> None:
         out_fname.unlink()
 
     if args.debug and args.mt:
-        logging.warning("Debug mode and multithreading are not compatible. Disabling multithreading.")
+        logging.warning(
+            "Debug mode and multithreading are not compatible. Disabling multithreading."
+        )
         args.mt = False
 
     set_ROOT_opts(args.mt)
