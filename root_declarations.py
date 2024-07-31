@@ -1,5 +1,7 @@
 import os
 import logging
+from pathlib import Path
+import sys
 
 import ROOT
 import numpy as np
@@ -12,8 +14,13 @@ def set_ROOT_opts(mt: bool = False) -> None:
     logging.info("Setting ROOT options and loading libraries")
     if mt:
         ROOT.EnableImplicitMT(20)
-    dk2nu_lib = os.environ["DK2NU_LIB"]
-    ROOT.gSystem.Load(f"{dk2nu_lib}/libdk2nuTree.so")
+
+    libdk2nuTree = Path(__file__).parent / "dk2nu/build/lib/libdk2nuTree.so"
+    if not libdk2nuTree.exists():
+        logging.error(f"Could not find libdk2nuTree.so at {libdk2nuTree}")
+        sys.exit(1)
+
+    ROOT.gSystem.Load(str(libdk2nuTree))
     ROOT.gSystem.Load("./libWeight.so")
     ROOT.gInterpreter.Declare('#include "Weight.h"')
 
