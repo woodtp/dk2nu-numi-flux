@@ -18,8 +18,10 @@ ln -sv $DK2NU/build/tree/{libdk2nuTree.rootmap,module.modulemap,libdk2nuTree_rdi
 
 cd $PROJECT_ROOT
 
-g++ -O3 -Wall -Wextra -pedantic -c -fPIC -L$DK2NU_LIB -I$DK2NU_INC -ldk2nuTree $(root-config --cflags --libs) Weight.cc
-g++ -shared -o libWeight.so Weight.o
+CXX=clang++
+CFLAGS="-O3 -Wall -Wextra -pedantic -c -fPIC $(root-config --cflags)"
+$CXX $CFLAGS Weight.cc
+$CXX -shared -o libWeight.so Weight.o
 
 python -m venv venv
 source venv/bin/activate
