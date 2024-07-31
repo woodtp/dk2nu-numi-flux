@@ -26,11 +26,18 @@ def run_analysis(
     out_fname: str,
     tree_name: str,
     location: list[float],
+    mt: bool,
     debug: bool = False,
 ) -> None:
-    df = ROOT.RDataFrame("dk2nuTree", in_fname)
+    df = ROOT.RDataFrame("dk2nuTree", in_fname)  # type: ignore
     if debug:
         df = df.Range(0, 10000)
+
+    root_version = ROOT.__version__  # type: ignore
+    _, minor, _ = map(int, root_version.split("."))  # major, minor, patch
+
+    if not mt or minor >= 30:
+        ROOT.RDF.Experimental.AddProgressBar(df)  # type: ignore
 
     logging.debug(f"Loaded {in_fname}. Applying definitions...")
     logging.debug(f"Location: {location}")
@@ -73,7 +80,7 @@ def run_analysis(
         f"Snapshotting to {out_fname}. Event loop will be executed now, this might take a while..."
     )
 
-    opts = ROOT.RDF.RSnapshotOptions()
+    opts = ROOT.RDF.RSnapshotOptions()  # type: ignore
     opts.fMode = "UPDATE"
     # opts.fCompressionAlgorithm = ROOT.kLZMA
     # opts.fCompressionLevel = 9
@@ -81,8 +88,8 @@ def run_analysis(
     df.Snapshot(tree_name, out_fname, branches, opts)  # type: ignore
 
 
-def load_file(fname: str) -> ROOT.RDataFrame:
-    return ROOT.RDataFrame("fluxTree", fname)
+def load_file(fname: str) -> ROOT.RDataFrame:  # type: ignore
+    return ROOT.RDataFrame("fluxTree", fname)  # type: ignore
 
 
 def main() -> None:
@@ -150,15 +157,15 @@ def main() -> None:
     for name, files in cfg["file_sets"].items():
         tree_name = f"fluxTree_{name}"
         run_analysis(
-            files, str(out_fname), tree_name, cfg["location"], debug=args.debug
+            files, str(out_fname), tree_name, cfg["location"], args.mt, debug=args.debug
         )
 
     for name, files in cfg["file_sets"].items():
         pot = get_pot(files, cfg["pot_per_file"])
-        hpot = ROOT.TH1D(f"hpot_{name}", "POT", 1, 0, 1)
+        hpot = ROOT.TH1D(f"hpot_{name}", "POT", 1, 0, 1)  # type: ignore
         hpot.SetBinContent(1, pot)
         logging.info(f"POT = {pot:_}. Writing to {out_fname}:{hpot.GetName()}")
-        with ROOT.TFile.Open(str(out_fname), "UPDATE") as _:
+        with ROOT.TFile.Open(str(out_fname), "UPDATE") as _:  # type: ignore
             hpot.Write()
 
 

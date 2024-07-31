@@ -1,7 +1,7 @@
 import ROOT  # type: ignore
 
 
-def apply_defs(df: ROOT.RDataFrame, det_loc: list[float]) -> ROOT.RDataFrame:
+def apply_defs(df: ROOT.RDataFrame, det_loc: list[float]) -> ROOT.RDataFrame:  # type: ignore
     if len(det_loc) != 3:
         raise ValueError("Detector location must be a list of 3 floats!")
 
@@ -30,13 +30,13 @@ def apply_defs(df: ROOT.RDataFrame, det_loc: list[float]) -> ROOT.RDataFrame:
             "v_parent_momentum",
             "ROOT::RVec<double>{pdpx, pdpy, pdpz}",
         )
-        .Define("sangdet", "Numba::calc_solid_angle(rr)")
-        .Define("costh", "Numba::calc_costheta_par(v_parent_momentum, rr)")
+        .Define("sangdet", "Numba::calc_solid_angle(rr)")                               # Solid angle as fraction of 4pi
+        .Define("costh", "Numba::calc_costheta_par(v_parent_momentum, rr)")             # Cosine of the angle between the parent particle and the detector component
         .Define("parent_mass", "Numba::pdg_to_mass(parent_pdg)")
-        .Define("parent_energy", "Numba::calc_energy(v_parent_momentum, parent_mass)")
-        .Define("pgamma", "Numba::calc_gamma(parent_energy, parent_mass)")
-        .Define("emrat", "Numba::calc_energy_in_beam(pgamma, costh)")
-        .Define("nu_energy", "dk2nu.decay.necm * emrat")
+        .Define("parent_energy", "Numba::calc_energy(v_parent_momentum, parent_mass)")  # Calculate the energy of the parent particle at the decay vertex
+        .Define("pgamma", "Numba::calc_gamma(parent_energy, parent_mass)")              # Calculate the gamma factor of the parent particle
+        .Define("emrat", "Numba::calc_energy_in_beam(pgamma, costh)")                   # Weighted neutrino energy in the lab frame. Small angle approximation.
+        .Define("nu_energy", "dk2nu.decay.necm * emrat")                                # Lorentz boost the neutrino energy into the lab frame
         .Define(
             "weight",
             "calc_weight(dk2nu.decay, sangdet, emrat, parent_energy, nu_energy, pgamma, rr)",

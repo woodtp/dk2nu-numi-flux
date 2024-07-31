@@ -11,19 +11,20 @@ logging.info("jit'ing functions...")
 def set_ROOT_opts(mt: bool = False) -> None:
     logging.info("Setting ROOT options and loading libraries")
     if mt:
-        ROOT.EnableImplicitMT(20)
+        logging.warning("Enabling ROOT's implicit multithreading. Sometimes this causes issues...")
+        ROOT.EnableImplicitMT()  # type: ignore
 
     libdk2nuTree = Path(__file__).parent / "dk2nu/build/lib/libdk2nuTree.so"
     if not libdk2nuTree.exists():
         logging.error(f"Could not find libdk2nuTree.so at {libdk2nuTree}")
         sys.exit(1)
 
-    ROOT.gSystem.Load(str(libdk2nuTree))
-    ROOT.gSystem.Load("./libWeight.so")
-    ROOT.gInterpreter.Declare('#include "Weight.h"')
+    ROOT.gSystem.Load(str(libdk2nuTree))  # type: ignore
+    ROOT.gSystem.Load("./libWeight.so")  # type: ignore
+    ROOT.gInterpreter.Declare('#include "Weight.h"')  # type: ignore
 
 
-@ROOT.Numba.Declare(["int"], "double")
+@ROOT.Numba.Declare(["int"], "double")  # type: ignore
 def pdg_to_mass(pdg: int) -> float:
     """
     Get the mass of a particle given its PDG code.
@@ -62,38 +63,40 @@ def pdg_to_mass(pdg: int) -> float:
     return -1.0
 
 
-@ROOT.Numba.Declare(["RVec<double>", "RVec<double>", "RVec<double>"], "RVec<double>")
+@ROOT.Numba.Declare(["RVec<double>", "RVec<double>", "RVec<double>"], "RVec<double>")  # type: ignore
 def calc_magnitudes(vx: np.ndarray, vy: np.ndarray, vz: np.ndarray) -> np.ndarray:
     return np.sqrt(vx**2 + vy**2 + vz**2)
 
 
-@ROOT.Numba.Declare(["RVec<double>", "double"], "double")
+@ROOT.Numba.Declare(["RVec<double>", "double"], "double")  # type: ignore
 def calc_energy(p: np.ndarray, mass: float) -> float:
     """Calculate the energy of a particle given from its four-momentum."""
-    return np.sqrt(p[0] ** 2 + p[1] ** 2 + p[2] ** 2 + mass**2)
+    return np.sqrt(np.sum(p**2) + mass**2)
 
 
-@ROOT.Numba.Declare(["double", "double"], "double")
+@ROOT.Numba.Declare(["double", "double"], "double")  # type: ignore
 def calc_gamma(energy: float, mass: float) -> float:
     """Calculate the gamma factor of a particle given its energy and mass."""
     return energy / mass
 
 
-@ROOT.Numba.Declare(["double"], "double")
+@ROOT.Numba.Declare(["double"], "double")  # type: ignore
 def calc_beta(gamma: float) -> float:
     return np.sqrt(1.0 - 1.0 / gamma**2)
 
 
-@ROOT.Numba.Declare(["double", "double"], "double")
+@ROOT.Numba.Declare(["double", "double"], "double")  # type: ignore
 def calc_energy_in_beam(gamma: float, costh: float) -> float:
-    beta = np.sqrt(1.0 - 1.0 / gamma**2)
-    return 1.0 / (gamma * (1.0 - beta * costh))
+    """ Calculate the fraction of the energy of a particle in the beam direction.
+    """
+    beta = np.sqrt(1 - 1 / gamma**2)
+    return 1 / (gamma * (1 - beta * costh))
 
 
-@ROOT.Numba.Declare(["RVec<double>"], "double")
+@ROOT.Numba.Declare(["RVec<double>"], "double")  # type: ignore
 def calc_solid_angle(rr: np.ndarray) -> float:
     """
-    Calculate solid angle/4pi of a point.
+    Calculate solid angle/4pi of a point (small angle approximation).
 
     Parameters
     ----------
@@ -106,15 +109,16 @@ def calc_solid_angle(rr: np.ndarray) -> float:
     solid_angle : float
         solid angle of the point.
     """
-    rdet = 100.0  # for converting to cm
-    mag2 = rr[0] ** 2 + rr[1] ** 2 + rr[2] ** 2
-    return (rdet**2) / mag2 / (4.0 * np.pi)
+    rdet2 = 100**2  # for converting to cm
+    rrmag2 = rr[0]**2 + rr[1]**2 + rr[2]**2
+    return rdet2 / rrmag2 / (4.0 * np.pi)
 
 
-@ROOT.Numba.Declare(["RVec<double>", "RVec<double>"], "double")
+@ROOT.Numba.Declare(["RVec<double>", "RVec<double>"], "double")  # type: ignore
 def calc_costheta_par(parent_momentum: np.ndarray, rr: np.ndarray) -> float:
     """
-    Calculate a boost correction factor from the parent particle's momentum.
+    Calculate the angle between a momentum vector and position. If either the parent momentum or the position vector is
+    zero, the function returns -9999.0. Otherwise, the result is clipped to [-1, 1].
 
     Parameters
     ----------
@@ -129,29 +133,24 @@ def calc_costheta_par(parent_momentum: np.ndarray, rr: np.ndarray) -> float:
         boost factor
     """
 
-    dot = (
-        parent_momentum[0] * rr[0]
-        + parent_momentum[1] * rr[1]
-        + parent_momentum[2] * rr[2]
-    )
-    mom_mag = np.sqrt(
-        parent_momentum[0] ** 2 + parent_momentum[1] ** 2 + parent_momentum[2] ** 2
-    )
-    rr_mag = np.sqrt(rr[0] ** 2 + rr[1] ** 2 + rr[2] ** 2)
-    costh = dot / (mom_mag * rr_mag)
-    if costh > 1.0:
-        return 1.0
-    if costh < -1.0:
-        return -1.0
-    return costh
+    if not parent_momentum.any() or not rr.any():
+        return -9999.0
+
+    mom_mag = np.sqrt(np.sum(parent_momentum**2))
+    rr_mag = np.sqrt(np.sum(rr**2))
+    dot = parent_momentum[0]*rr[0] + parent_momentum[1]*rr[1] + parent_momentum[2]*rr[2]
+
+    return max(min(dot / (mom_mag * rr_mag), 1.0), -1.0)
 
 
-@ROOT.Numba.Declare(["RVec<double>", "RVec<double>"], "double")
+
+@ROOT.Numba.Declare(["RVec<double>", "RVec<double>"], "double")  # type: ignore
 def theta_p(p: np.ndarray, det_loc: np.ndarray) -> float:
     """
     Calculate the angle (in degrees) between a momentum vector and NuMI within the plane
     connecting the detector location and the NuMI axis.
     If the provided location is colinear with the beam axis, the angle is calculated with respect to the x-z plane.
+    If the input momentum vector is zero, the function returns -9999.0.
 
     Parameters
     ----------
@@ -165,6 +164,8 @@ def theta_p(p: np.ndarray, det_loc: np.ndarray) -> float:
          theta : float
          The angle between the momentum vector and the NuMI axis in degrees.
     """
+    if not p.any():
+        return -9999.0
 
     numi_axis = np.array([0, 0, 1.0])
 
@@ -175,13 +176,11 @@ def theta_p(p: np.ndarray, det_loc: np.ndarray) -> float:
 
     # computing dot product manually to suppress warnings about
     # the input RVecD not being in contiguous memory.
-    proj_mag = (p[0] * n[0] + p[1] * n[1] + p[2] * n[2]) / (n**2).sum()
+    proj_mag = (p[0] * n[0] + p[1] * n[1] + p[2] * n[2]) / np.sum(n**2)
 
     projection = p - proj_mag * n
 
-    costh = (projection @ numi_axis) / (
-        np.linalg.norm(projection) * np.linalg.norm(numi_axis)
-    )
+    costh = (projection @ numi_axis) / np.sum(projection**2)
     theta = np.degrees(np.arccos(costh))
 
     crossprod = np.cross(projection, numi_axis)
@@ -190,7 +189,7 @@ def theta_p(p: np.ndarray, det_loc: np.ndarray) -> float:
     return theta
 
 
-@ROOT.Numba.Declare(["RVec<int>"], "RVec<int>")
+@ROOT.Numba.Declare(["RVec<int>"], "RVec<int>")  # type: ignore
 def parent_to_code(parents: np.ndarray) -> np.ndarray:
     def codes(pdg):
         if pdg == 2212:
@@ -217,7 +216,7 @@ def parent_to_code(parents: np.ndarray) -> np.ndarray:
     return np.array([codes(p) for p in parents[:-1]], dtype=np.int32)
 
 
-@ROOT.Numba.Declare(["RVec<int>"], "RVec<int>")
+@ROOT.Numba.Declare(["RVec<int>"], "RVec<int>")  # type: ignore
 def target_to_code(targets: np.ndarray) -> np.ndarray:
     def _codes(pdg):
         if pdg == 1000060120:  # carbon
@@ -237,12 +236,12 @@ def target_to_code(targets: np.ndarray) -> np.ndarray:
     return np.array([_codes(p) for p in targets[:-1]], dtype=np.int32)
 
 
-@ROOT.Numba.Declare(["RVec<int>"], "RVec<int>")
+@ROOT.Numba.Declare(["RVec<int>"], "RVec<int>")  # type: ignore
 def ancestor_parent_pdg(ancestor_pdg: np.ndarray) -> np.ndarray:
     return np.append(np.array([0], dtype=np.int32), ancestor_pdg[:-2])
 
 
-@ROOT.Numba.Declare(["RVec<int>"], "RVec<double>")
+@ROOT.Numba.Declare(["RVec<int>"], "RVec<double>")  # type: ignore
 def ancestor_pdg2mass(pdg_ids: np.ndarray):
     """I hate this but it works."""
 
