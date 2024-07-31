@@ -1,11 +1,13 @@
-#!/bin/bash
+source /cvmfs/icarus.opensciencegrid.org/products/icarus/setup_icarus.sh
 
 git submodule update --init
 
-PROJECT_ROOT=$(pwd)
-export DK2NU=$PROJECT_ROOT/dk2nu
+export DK2NU=$PWD/dk2nu
 export DK2NU_INC=$DK2NU/tree
 export DK2NU_LIB=$DK2NU/build/lib
+
+setup root v6_28_10a -q e28:p3915:prof
+setup cmake v3_27_4
 
 BUILD_DIR=$DK2NU/build
 
@@ -16,7 +18,7 @@ make -j$(nproc)
 
 ln -sv $DK2NU/build/tree/{libdk2nuTree.rootmap,module.modulemap,libdk2nuTree_rdict.pcm} $DK2NU_LIB
 
-cd $PROJECT_ROOT
+cd ../..
 
 g++ -O3 -Wall -Wextra -pedantic -c -fPIC -L$DK2NU_LIB -I$DK2NU_INC -ldk2nuTree $(root-config --cflags --libs) Weight.cc
 g++ -shared -o libWeight.so Weight.o

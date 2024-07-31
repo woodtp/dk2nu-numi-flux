@@ -28,19 +28,40 @@ ancestor_vol               -- Vector of the interaction volumes for each ancesto
 
 ## Instructions to build
 
-### Requirements
-This package is intended to run in a SL7 environment. The `build.sh` script will set up the following dependencies:
+### OS-Independent Installation
+If doing an OS-Independent installation, the following dependencies are required:
+
+Prerequisites:
+- [ROOT](https://root.cern/install/) >=v6
+- [VDT](https://github.com/dpiparo/vdt) >=v04.4
+
+Both are prerequisites for [Dk2Nu](https://github.com/NuSoftHEP/dk2nu), which will built as part of the project.
+
+```shell
+$ git clone https://github.com/woodtp/dk2nu-numi-flux.git  # Clone the repository
+$ cd dk2nu-numi-flux  # Move into the project directory
+$ ./build.sh  # Build the project
+```
+
+### Building in an ICARUS GPVM
+The `build_sl7.sh` is intended to be *sourced* Scientific Linux Environment in an ICARUS GPVM.
+This script will set up the following dependencies:
 - CMake v3_27_4
 - Dk2Nu v01_10_01
 - ROOT v6_28_10a
 
 ```shell
-$ source ./build.sh  # Build the project, have to source instead of execute if on a FNAL GPVM
+$ source ./build_sl7_sourceme.sh  # Build the project, have to source instead of execute if on a FNAL GPVM
 ```
 
 ## Running the code
 ```shell
-$ source setup.sh  # Setup the environment, have to source instead of execute if on a FNAL GPVM
+# If on ICARUS GPVM, source the sl7 setup script
+$ source setup_sl7_sourceme.sh
+
+# Otherwise, if using the OS-independent installation, then just activate the python environment
+$ source venv/bin/activate
+
 $ ./flux_ana.py  # Run the code
 ```
 
@@ -77,4 +98,7 @@ nominal = "/path/to/files/*.root"   # Path to flux files in Dk2Nu format
 ```
 
 # References
-- [Dk2Nu format](https://github.com/NuSoftHEP/dk2nu)
+- [G4NuMI](https://cdcvs.fnal.gov/redmine/projects/numi-beam-sim/wiki)
+- [Dk2Nu](https://github.com/NuSoftHEP/dk2nu)
+- [ROOT](https://root.cern/install/) >=v6
+- [VDT](https://github.com/dpiparo/vdt) >=v04.4
