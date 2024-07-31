@@ -88,25 +88,26 @@ def load_file(fname: str) -> ROOT.RDataFrame:
 def main() -> None:
     desc = "Reads Dk2Nu format, calculates weights for the input position, and writes a tree to a new ROOT file."
     parser = argparse.ArgumentParser(description=desc)
-    parser.add_argument("-c", "--config", help="path to configuration file")
+    parser.add_argument("-c", "--config", help="Path to configuration file. If unspecified, defaults to the `config.toml` in the current directory.", default="config.toml")
     parser.add_argument(
         "-f",
         "--overwrite",
-        help="overwrite output file if it exists",
+        help="Overwrite output file if it exists",
         action="store_true",
     )
-    parser.add_argument("--mt", help="use multithreading", action="store_true")
+    parser.add_argument("--mt", help="Use multithreading", action="store_true")
     parser.add_argument("-d", "--debug", action="store_true", help="run in debug mode")
-
-    if len(sys.argv) == 1:
-        parser.print_help(sys.stderr)
-        sys.exit(1)
 
     args = parser.parse_args()
 
     if args.debug:
         logger = logging.getLogger()
         logger.level = logging.DEBUG
+
+    cfg_file = Path(args.config)
+    if not cfg_file.exists():
+        logging.error("Could not find config.toml. Exiting...")
+        sys.exit(1)
 
     cfg = toml.load(args.config)
 
