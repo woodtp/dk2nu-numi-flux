@@ -41,7 +41,7 @@ def pdg_to_mass(pdg: int) -> float:
     """
 
     if abs(pdg) == 13:
-        return 0.13957039  # muon mass
+        return 0.1056583755  # muon mass
     if abs(pdg) == 15:
         return 1.77686  # tau mass
     if abs(pdg) == 211:

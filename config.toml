@@ -6,11 +6,50 @@ output_file = "output.root"
 pot_per_file = 500_000
 
 [file_sets]
-nominal_fhc = "/pnfs/icarus/persistent/users/awood/g4numi_checks/FHC/false/g4numi*.root"
-nominal_rhc = "/pnfs/icarus/persistent/users/awood/g4numi_checks/RHC/false/g4numi*.root"
+fhc = "/pnfs/icarus/persistent/users/awood/2024-06-27_numi_beamsim_g4.10/me000z200i/run0/g4numi*.root"
 
-g3Chase_fhc = "/pnfs/icarus/persistent/users/awood/g4numi_checks/FHC/true/g4numi*.root"
-g3Chase_rhc = "/pnfs/icarus/persistent/users/awood/g4numi_checks/RHC/true/g4numi*.root"
+[aliases]
+# Rename quantities for easier access.
+# see ROOT::RDataFrame::Alias
+nu_pdg     = "dk2nu.decay.ntype"
+parent_pdg = "dk2nu.decay.ptype"
+vx         = "dk2nu.decay.vx"
+vy         = "dk2nu.decay.vy"
+vz         = "dk2nu.decay.vz"
+pdpx       = "dk2nu.decay.pdpx"
+pdpy       = "dk2nu.decay.pdpy"
+pdpz       = "dk2nu.decay.pdpz"
 
-g4Update_fhc = "/exp/icarus/data/users/awood/uboone_beamsim_g4.10.4/me000z200i/run0/files/g4numi*.root"
-g4Update_rhc = "/exp/icarus/data/users/awood/uboone_beamsim_g4.10.4/me000z-200i/run0/files/g4numi*.root"
+[filters]
+# Define filters to apply to the entries
+# see ROOT::RDataFrame::Filter
+no_dar = "parent_momentum > 0."
+
+[definitions]
+# Define quantities to calculate
+# see ROOT::RDataFrame::Define
+parent_momentum   = "sqrt(pdpx*pdpx + pdpy*pdpy + pdpz*pdpz)"
+ancestor_vol      = "get_volumes(dk2nu.ancestor)"
+decay_vertex      = "ROOT::RVec<double>{vx, vy, vz}"
+rr                = "det_loc - decay_vertex"
+v_parent_momentum = "ROOT::RVec<double>{pdpx, pdpy, pdpz}"
+sangdet           = "Numba::calc_solid_angle(rr)"                         # Solid angle as fraction of 4pi
+costh 		      = "Numba::calc_costheta_par(v_parent_momentum, rr)"     # Cosine of the angle between the parent particle and the detector component
+parent_mass       = "Numba::pdg_to_mass(parent_pdg)"
+parent_energy     = "Numba::calc_energy(v_parent_momentum, parent_mass)"  # Calculate the energy of the parent particle at the decay vertex
+pgamma            = "Numba::calc_gamma(parent_energy, parent_mass)"       # Calculate the gamma factor of the parent particle
+emrat             = "Numba::calc_energy_in_beam(pgamma, costh)"           # Weighted neutrino energy in the lab frame. Small angle approximation.
+nu_energy         = "dk2nu.decay.necm * emrat"                            # Lorentz boost the neutrino energy into the lab frame
+weight            = "calc_weight(dk2nu.decay, sangdet, emrat, parent_energy, nu_energy, pgamma, rr)"
+# theta_p = "Numba::theta_p(v_parent_momentum, det_loc)"
+# par_codes = "Numba::parent_to_code(dk2nu.ancestor.pdg)"
+# target_codes = "Numba::target_to_code(dk2nu.ancestor.nucleus)"
+# ancestor_parent_pdg = "Numba::ancestor_parent_pdg(dk2nu.ancestor.pdg)"
+# ancestor_parent_mom = "Numba::calc_magnitudes(dk2nu.ancestor.pprodpx, dk2nu.ancestor.pprodpy, dk2nu.ancestor.pprodpz)"
+# ancestor_parent_mom = "get_incident_momenta(dk2nu.ancestor)"
+# ancestor_produced_mom = "get_produced_momenta(dk2nu.ancestor)"
+# ancestor_produced_theta = "calc_theta(dk2nu.ancestor)"
+# ancestor_mass = "Numba::ancestor_pdg2mass(dk2nu.ancestor.pdg)"
+# ancestor_pT = "calc_pT(dk2nu.ancestor)"
+# ancestor_xF = "calc_xF(dk2nu.ancestor, ancestor_mass)"
+

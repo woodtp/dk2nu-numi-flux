@@ -6,13 +6,14 @@ import logging
 import sys
 import time
 from pathlib import Path
-
-logging.basicConfig(level=logging.INFO, format="[%(levelname)s] %(message)s")
+from typing import Any
 
 import ROOT  # type: ignore
 import toml
 
-from spectra_definitions import apply_defs
+logging.basicConfig(level=logging.INFO, format="[%(levelname)s] %(message)s")
+
+# from spectra_definitions import apply_defs
 
 
 def get_pot(files: str, pot_per_file: int) -> int:
@@ -25,7 +26,7 @@ def run_analysis(
     in_fname: str,
     out_fname: str,
     tree_name: str,
-    location: list[float],
+    cfg: dict[str, Any],
     debug: bool = False,
 ) -> None:
     df = ROOT.RDataFrame("dk2nuTree", in_fname)  # type: ignore
@@ -42,8 +43,30 @@ def run_analysis(
         ROOT.RDF.Experimental.AddProgressBar(df)  # type: ignore
 
     logging.debug(f"Loaded {in_fname}. Applying definitions...")
-    logging.debug(f"Location: {location}")
-    df = apply_defs(df, location)
+
+    det_loc: list[float] = [float(x) for x in cfg["location"]]
+    if len(det_loc) != 3:
+        logging.error(
+            f"Invalid location format: {det_loc}. Please provide '[x, y, z]'. Exiting..."
+        )
+        sys.exit(1)
+    logging.info(f"Going to calculate weights for location: {det_loc}")
+
+    logging.debug(f"Location: {det_loc}")
+
+    df = df.Define("det_loc", f"ROOT::RVec<double>{{ {det_loc[0]}, {det_loc[1]}, {det_loc[2]} }}")
+
+    for key, val in cfg["aliases"].items():
+        logging.debug(f"Applying Alias: {val} -> {key}")
+        df = df.Alias(key, val)
+
+    for key, val in cfg["definitions"].items():
+        logging.debug(f"Applying definition: {key}")
+        df = df.Define(key, val)
+
+    for val in cfg["filters"].values():
+        logging.debug(f"Applying filter: {val}")
+        df = df.Filter(val)
 
     branches = [
         "nu_pdg",
@@ -72,20 +95,36 @@ def run_analysis(
         "ancestor_vol",
     ]
 
+    # opts.fCompressionAlgorithm = ROOT.kLZMA
+    # opts.fCompressionLevel = 9
+
+    # TODO: Allow for histograms to be defined in the config file.
+    # df = df.Filter("nu_pdg == 12")
+    #
+    # hists = [
+    #     df.Histo1D(("hnom_numu", "#nu_{e}", 60, 0, 6), "nu_energy", "weight"),
+    #     # df.Filter("parent_pdg == 211").Histo1D(("hnom_numu_pip", "#pi^{+} #to #nu_{e}", 60, 0, 6), "nu_energy", "weight"),
+    #     df.Filter("parent_pdg == 321").Histo1D(("hnom_numu_Kp", "K^{+} #to #nu_{e}", 60, 0, 6), "nu_energy", "weight"),
+    #     df.Filter("parent_pdg == -13").Histo1D(("hnom_numu_mup", "#mu^{+} #to #nu_{e}", 60, 0, 6), "nu_energy", "weight"),
+    # ]
+    #
+    # with ROOT.TFile.Open(out_fname, "UPDATE") as _:  # type: ignore
+    #     for h in hists:
+    #         logging.info(f"Writing histogram {h.GetName()} to {out_fname}...")
+    #         h.Write()
+
     tree_log_str = f"Preparing Tree '{tree_name}' with branches:\n\n"
     for branch in branches:
         tree_log_str += "* " + branch + "\n"
+
+    opts = ROOT.RDF.RSnapshotOptions()  # type: ignore
+    opts.fMode = "UPDATE"
 
     logging.info(tree_log_str)
 
     logging.info(
         f"Snapshotting to {out_fname}. Event loop will be executed now, this might take a while..."
     )
-
-    opts = ROOT.RDF.RSnapshotOptions()  # type: ignore
-    opts.fMode = "UPDATE"
-    # opts.fCompressionAlgorithm = ROOT.kLZMA
-    # opts.fCompressionLevel = 9
 
     df.Snapshot(tree_name, out_fname, branches, opts)  # type: ignore
 
@@ -125,14 +164,6 @@ def main() -> None:
 
     cfg = toml.load(args.config)
 
-    loc: list[float] = [float(x) for x in cfg["location"]]
-    if len(loc) != 3:
-        logging.error(
-            f"Invalid location format: {loc}. Please provide '[x, y, z]'. Exiting..."
-        )
-        sys.exit(1)
-    logging.info(f"Going to calculate weights for location: {loc}")
-
     from root_declarations import set_ROOT_opts
 
     out_fname = Path(cfg["output_file"])
@@ -159,7 +190,7 @@ def main() -> None:
     for name, files in cfg["file_sets"].items():
         tree_name = f"fluxTree_{name}"
         run_analysis(
-            files, str(out_fname), tree_name, cfg["location"], debug=args.debug
+            files, str(out_fname), tree_name, cfg, debug=args.debug
         )
 
     for name, files in cfg["file_sets"].items():

@@ -1,6 +1,17 @@
 #include "Weight.h"
 
 static constexpr double DEFAULT_DOUBLE = -9999.0;
+static constexpr double MUON_MASS = 0.1056583755; // [GeV/c^2]
+static constexpr double TAU_MASS = 1.77686; // [GeV/c^2]
+
+enum PDG {
+  ELECTRON = 11,
+  ELECTRON_NEUTRINO = 12,
+  MUON = 13,
+  MUON_NEUTRINO = 14,
+  TAU = 15,
+  TAU_NEUTRINO = 16
+};
 
 static double clip(const double val)
 {
@@ -70,6 +81,11 @@ std::vector<double> calc_theta(const ROOT::RVec<bsim::Ancestor>& ancestors)
 
     const double p_inc = std::sqrt(pprodpx * pprodpx + pprodpy * pprodpy + pprodpz * pprodpz); // [GeV/c]
 
+    if (p_prod == 0. || p_inc == 0.) {
+      thetas[i] = DEFAULT_DOUBLE;
+      continue;
+    }
+
     const double costh = clip((prod.startpx * pprodpx + prod.startpy * pprodpy + prod.startpz * pprodpz) / (p_prod * p_inc));
 
     thetas[i] = std::acos(costh);
@@ -97,6 +113,11 @@ std::vector<double> calc_pT(const ROOT::RVec<bsim::Ancestor>& ancestors)
     const double pprodpz = is_old_g4 ? ancestors[i - 1].pprodpz : prod.pprodpz;
 
     const double p_inc = std::sqrt(pprodpx * pprodpx + pprodpy * pprodpy + pprodpz * pprodpz); // [GeV/c]
+
+    if (p_prod == 0. || p_inc == 0.) {
+      pT[i] = DEFAULT_DOUBLE;
+      continue;
+    }
 
     const double costh = clip((prod.startpx * pprodpx + prod.startpy * pprodpy + prod.startpz * pprodpz) / (p_prod * p_inc));
 
@@ -128,8 +149,9 @@ std::vector<double> calc_xF(const ROOT::RVec<bsim::Ancestor>& ancestors,
     const double mass_inc2 = mass_inc * mass_inc;
     const double mass_prod = ancestor_masses[i];
 
-    auto const p_prod = std::sqrt(prod.startpx * prod.startpx + prod.startpy * prod.startpy +
-                                  prod.startpz * prod.startpz); // [GeV/c]
+    auto const p_prod = std::sqrt(prod.startpx*prod.startpx +
+                                  prod.startpy*prod.startpy +
+                                  prod.startpz*prod.startpz); // [GeV/c]
 
     const double pprodpx = is_old_g4 ? ancestors[i - 1].pprodpx : prod.pprodpx;
     const double pprodpy = is_old_g4 ? ancestors[i - 1].pprodpy : prod.pprodpy;
@@ -138,9 +160,14 @@ std::vector<double> calc_xF(const ROOT::RVec<bsim::Ancestor>& ancestors,
     const double p_inc =
       std::sqrt(pprodpx * pprodpx + pprodpy * pprodpy + pprodpz * pprodpz); // [GeV/c]
 
-    const double costh =
-      clip((prod.startpx * pprodpx + prod.startpy * pprodpy + prod.startpz * pprodpz) /
-           (p_prod * p_inc));
+    if (p_prod == 0. || p_inc == 0.) {
+      xF[i] = DEFAULT_DOUBLE;
+      continue;
+    }
+
+    const double costh = clip((prod.startpx*pprodpx +
+                               prod.startpy*pprodpy +
+                               prod.startpz*pprodpz) / (p_prod * p_inc));
 
     // Calculate the produced particle's longitudinal momentum in the lab frame
     const double pz = p_prod * costh;
@@ -174,47 +201,73 @@ double calc_weight(const bsim::Decay& decay,
                    const double gamma,
                    const ROOT::RVec<double>& rr)
 {
-  double wght = (det_angle * decay.nimpwt * (energy_ratio * energy_ratio));
+  // See: https://github.com/NuSoftHEP/dk2nu/blob/main/tree/calcLocationWeights.cxx#L48
 
-  if (std::abs(decay.ptype) != 13) { return wght; }
+  double wght = det_angle * decay.nimpwt * (energy_ratio * energy_ratio);
 
-  //boost new neutrino to mu decay cm
-  double beta[3];
-  double p_nu[3]; //nu momentum
-  beta[0] = decay.pdpx / parent_energy;
-  beta[1] = decay.pdpy / parent_energy;
-  beta[2] = decay.pdpz / parent_energy;
+  // if the nu parent is not a muon, we're done.
+  if (std::abs(decay.ptype) != PDG::MUON) return wght;
 
-  const double rr_mag = std::sqrt(rr[0] * rr[0] + rr[1] * rr[1] + rr[2] * rr[2]);
+  // For muon parents, we need to apply correction for non-isotropic decay
 
-  p_nu[0] = rr[0] * nu_energy / rr_mag;
-  p_nu[1] = rr[1] * nu_energy / rr_mag;
-  p_nu[2] = rr[2] * nu_energy / rr_mag;
+  auto dot_product = [](const double* a, const double* b, const std::size_t dim) {
+    double result = 0.;
+    for (std::size_t i = 0; i < dim; ++i) {
+      result += a[i] * b[i];
+    }
+    return result;
+  };
 
-  double partial = gamma * (beta[0] * p_nu[0] + beta[1] * p_nu[1] + beta[2] * p_nu[2]);
+  // Boost new neutrino to mu decay cm
+  const double beta[] = {
+    decay.pdpx / parent_energy,
+    decay.pdpy / parent_energy,
+    decay.pdpz / parent_energy
+  };
+
+  const double rr_mag = std::sqrt(rr[0]*rr[0] + rr[1]*rr[1] + rr[2]*rr[2]);
+
+  const double p_nu[] = {
+    rr[0] * nu_energy / rr_mag,
+    rr[1] * nu_energy / rr_mag,
+    rr[2] * nu_energy / rr_mag
+  };
+
+  double partial = gamma*dot_product(beta, p_nu, 3);
   partial = nu_energy - partial / (gamma + 1.);
-  double p_dcm_nu[4];
-  for (int i = 0; i < 3; i++)
+
+  // compute 4-momentum of the neutrino in the muon decay center of mass frame
+  double p_dcm_nu[4] = {0.};
+  for (int i = 0; i < 3; ++i) {
     p_dcm_nu[i] = p_nu[i] - beta[i] * gamma * partial;
-  p_dcm_nu[3] = 0.;
-  for (int i = 0; i < 3; i++)
-    p_dcm_nu[3] += p_dcm_nu[i] * p_dcm_nu[i];
+    p_dcm_nu[3] += p_dcm_nu[i]*p_dcm_nu[i];
+  }
   p_dcm_nu[3] = std::sqrt(p_dcm_nu[3]);
 
-  //boost parent of mu to mu production cm
-  // gamma = m_ppenergy / m_parent_mass;
-  beta[0] = decay.ppdxdz * decay.pppz / decay.ppenergy;
-  beta[1] = decay.ppdydz * decay.pppz / decay.ppenergy;
-  beta[2] = decay.pppz / decay.ppenergy;
-  partial = gamma * (beta[0] * decay.muparpx + beta[1] * decay.muparpy + beta[2] * decay.muparpz);
-  partial = decay.mupare - partial / (gamma + 1.);
-  double p_pcm_mp[4];
-  p_pcm_mp[0] = decay.muparpx - beta[0] * gamma * partial;
-  p_pcm_mp[1] = decay.muparpy - beta[1] * gamma * partial;
-  p_pcm_mp[2] = decay.muparpz - beta[2] * gamma * partial;
-  p_pcm_mp[3] = 0.;
-  for (int i = 0; i < 3; i++)
+  // Boost parent of mu to mu production cm
+  const double gamma_mu = decay.ppenergy / MUON_MASS;
+
+  const double beta_mu[] = {
+    decay.ppdxdz * decay.pppz / decay.ppenergy,
+    decay.ppdydz * decay.pppz / decay.ppenergy,
+    decay.pppz / decay.ppenergy
+  };
+
+  const double muparp[] = {
+    decay.muparpx,
+    decay.muparpy,
+    decay.muparpz
+  };
+
+  partial = gamma_mu*dot_product(beta_mu, muparp, 3);
+  partial = decay.mupare - partial / (gamma_mu + 1.);
+
+  // compute 4-momentum of the parent of the muon in the muon production center of mass frame
+  double p_pcm_mp[4] = {0.};
+  for (int i = 0; i < 3; ++i) {
+    p_pcm_mp[i] = muparp[i] - beta_mu[i] * gamma_mu * partial;
     p_pcm_mp[3] += p_pcm_mp[i] * p_pcm_mp[i];
+  }
   p_pcm_mp[3] = std::sqrt(p_pcm_mp[3]);
 
   double wt_ratio = 1.;
@@ -222,26 +275,21 @@ double calc_weight(const bsim::Decay& decay,
   //it can be 0 if mupar..=0. (I guess muons created in target??)
   if (p_pcm_mp[3] != 0.) {
     //calc new decay angle w.r.t. (anti)spin direction
-    const double costh =
-      clip((p_dcm_nu[0] * p_pcm_mp[0] + p_dcm_nu[1] * p_pcm_mp[1] + p_dcm_nu[2] * p_pcm_mp[2]) /
-           (p_dcm_nu[3] * p_pcm_mp[3]));
+    const double costh = clip(dot_product(p_dcm_nu, p_pcm_mp, 4) / (p_dcm_nu[3] * p_pcm_mp[3]));
 
     //calc relative weight due to angle difference
-    auto const nu_type = decay.ntype;
-    if (std::abs(nu_type) == 12) { wt_ratio = 1. - costh; }
-    else if (std::abs(nu_type) == 14) {
-      constexpr double mumass = 0.13957039;
-      double xnu = 2. * decay.necm / mumass;
+    if (std::abs(decay.ntype) == PDG::ELECTRON_NEUTRINO) { wt_ratio = 1. - costh; }
+    else if (std::abs(decay.ntype) == PDG::MUON_NEUTRINO) {
+      const double xnu = 2. * decay.necm / MUON_MASS;
       wt_ratio = ((3. - 2. * xnu) - (1. - 2. * xnu) * costh) / (3. - 2. * xnu);
     }
-    else if (std::abs(nu_type) == 16) {
-      constexpr double taumass = 1.77686;
-      double xnu = 2. * decay.necm / taumass;
+    else if (std::abs(decay.ntype) == PDG::TAU_NEUTRINO) {
+      const double xnu = 2. * decay.necm / TAU_MASS;
       wt_ratio = ((3. - 2. * xnu) - (1. - 2. * xnu) * costh) / (3. - 2. * xnu);
       std::cout << "calculating weight for tau neutrino; this may not be correct" << std::endl;
     }
     else {
-      std::cout << "eventRates:: Bad neutrino type = " << nu_type << std::endl;
+      std::cout << "eventRates:: Bad neutrino type = " << decay.ntype << std::endl;
     }
   }
   return wght * wt_ratio;
