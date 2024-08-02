@@ -208,7 +208,7 @@ double calc_weight(const bsim::Decay& decay,
   // if the nu parent is not a muon, we're done.
   if (std::abs(decay.ptype) != PDG::MUON) return wght;
 
-  // For muon parents, we need to apply correction for non-isotropic decay
+  // For muon parents, we need to apply correction for anisotropic decay
 
   auto dot_product = [](const double* a, const double* b, const std::size_t dim) {
     double result = 0.;
