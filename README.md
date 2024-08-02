@@ -57,7 +57,7 @@ $ source ./build_sl7_sourceme.sh  # Build the project, have to source instead of
 ## Running the code
 ```shell
 # If on ICARUS GPVM, source the sl7 setup script
-$ source setup_sl7_sourceme.sh
+$ source setup_sl7.sh
 
 # Otherwise, if using the OS-independent installation, then just activate the python environment
 $ source venv/bin/activate
