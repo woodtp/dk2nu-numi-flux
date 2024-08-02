@@ -68,33 +68,6 @@ def run_analysis(
         logging.debug(f"Applying filter: {val}")
         df = df.Filter(val)
 
-    branches = [
-        "nu_pdg",
-        "parent_pdg",
-        "weight",
-        "nu_energy",
-        "vx",
-        "vy",
-        "vz",
-        "ppvx",
-        "ppvy",
-        "ppvz",
-        "pdpx",
-        "pdpy",
-        "pdpz",
-        "parent_momentum",
-        "theta_p",
-        "par_codes",
-        "target_codes",
-        "ancestor_parent_pdg",
-        "ancestor_parent_mom",
-        "ancestor_produced_mom",
-        "ancestor_produced_theta",
-        "ancestor_pT",
-        "ancestor_xF",
-        "ancestor_vol",
-    ]
-
     # opts.fCompressionAlgorithm = ROOT.kLZMA
     # opts.fCompressionLevel = 9
 
@@ -114,7 +87,7 @@ def run_analysis(
     #         h.Write()
 
     tree_log_str = f"Preparing Tree '{tree_name}' with branches:\n\n"
-    for branch in branches:
+    for branch in cfg["definitions"].keys():
         tree_log_str += "* " + branch + "\n"
 
     opts = ROOT.RDF.RSnapshotOptions()  # type: ignore
@@ -126,7 +99,7 @@ def run_analysis(
         f"Snapshotting to {out_fname}. Event loop will be executed now, this might take a while..."
     )
 
-    df.Snapshot(tree_name, out_fname, branches, opts)  # type: ignore
+    df.Snapshot(tree_name, out_fname, cfg["definitions"].keys(), opts)  # type: ignore
 
 
 def load_file(fname: str) -> ROOT.RDataFrame:  # type: ignore
