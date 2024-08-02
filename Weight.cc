@@ -73,17 +73,19 @@ std::vector<double> calc_theta(const ROOT::RVec<bsim::Ancestor>& ancestors)
 
     auto const& prod = ancestors[i];
 
-    const double pprodpx = is_old_g4 ? ancestors[i - 1].pprodpx : prod.pprodpx;
-    const double pprodpy = is_old_g4 ? ancestors[i - 1].pprodpy : prod.pprodpy;
-    const double pprodpz = is_old_g4 ? ancestors[i - 1].pprodpz : prod.pprodpz;
+    const double pincpx = is_old_g4 ? ancestors[i - 1].pprodpx : prod.pprodpx;
+    const double pincpy = is_old_g4 ? ancestors[i - 1].pprodpy : prod.pprodpy;
+    const double pincpz = is_old_g4 ? ancestors[i - 1].pprodpz : prod.pprodpz;
+    const double p_inc = std::sqrt(pincpx*pincpx + pincpy*pincpy + pincpz*pincpz); // [GeV/c]
 
-    const double p_prod = std::sqrt(prod.startpx*prod.startpx + prod.startpy*prod.startpy + prod.startpz*prod.startpz); // [GeV/c]
+    const double p_prod = std::sqrt(prod.startpx*prod.startpx +
+                                    prod.startpy*prod.startpy +
+                                    prod.startpz*prod.startpz); // [GeV/c]
 
-    const double p_inc = std::sqrt(pprodpx*pprodpx + pprodpy*pprodpy + pprodpz*pprodpz); // [GeV/c]
 
     if (p_prod == 0. || p_inc == 0.) continue;
 
-    const double costh = clip((prod.startpx*pprodpx + prod.startpy*pprodpy + prod.startpz*pprodpz) / (p_prod*p_inc));
+    const double costh = clip((prod.startpx*pincpx + prod.startpy*pincpy + prod.startpz*pincpz) / (p_prod*p_inc));
 
     thetas[i] = std::acos(costh);
   }
@@ -102,18 +104,19 @@ std::vector<double> calc_pT(const ROOT::RVec<bsim::Ancestor>& ancestors)
 
     auto const& prod = ancestors[i];
 
-    auto const p_prod = std::sqrt(prod.startpx*prod.startpx + prod.startpy*prod.startpy +
-                                  prod.startpz*prod.startpz);
+    const double pincpx = is_old_g4 ? ancestors[i - 1].pprodpx : prod.pprodpx;
+    const double pincpy = is_old_g4 ? ancestors[i - 1].pprodpy : prod.pprodpy;
+    const double pincpz = is_old_g4 ? ancestors[i - 1].pprodpz : prod.pprodpz;
+    const double p_inc = std::sqrt(pincpx*pincpx + pincpy*pincpy + pincpz*pincpz); // [GeV/c]
 
-    const double pprodpx = is_old_g4 ? ancestors[i - 1].pprodpx : prod.pprodpx;
-    const double pprodpy = is_old_g4 ? ancestors[i - 1].pprodpy : prod.pprodpy;
-    const double pprodpz = is_old_g4 ? ancestors[i - 1].pprodpz : prod.pprodpz;
+    const double p_prod = std::sqrt(prod.startpx*prod.startpx +
+                                    prod.startpy*prod.startpy +
+                                    prod.startpz*prod.startpz);
 
-    const double p_inc = std::sqrt(pprodpx*pprodpx + pprodpy*pprodpy + pprodpz*pprodpz); // [GeV/c]
 
     if (p_prod == 0. || p_inc == 0.) continue;
 
-    const double costh = clip((prod.startpx*pprodpx + prod.startpy*pprodpy + prod.startpz*pprodpz) / (p_prod*p_inc));
+    const double costh = clip((prod.startpx*pincpx + prod.startpy*pincpy + prod.startpz*pincpz) / (p_prod*p_inc));
 
     const double sinth = std::sqrt(1. - costh*costh);
 
@@ -143,21 +146,20 @@ std::vector<double> calc_xF(const ROOT::RVec<bsim::Ancestor>& ancestors,
     const double mass_inc2 = mass_inc*mass_inc;
     const double mass_prod = ancestor_masses[i];
 
+    const double pincpx = is_old_g4 ? ancestors[i - 1].pprodpx : prod.pprodpx;
+    const double pincpy = is_old_g4 ? ancestors[i - 1].pprodpy : prod.pprodpy;
+    const double pincpz = is_old_g4 ? ancestors[i - 1].pprodpz : prod.pprodpz;
+    const double p_inc = std::sqrt(pincpx*pincpx + pincpy*pincpy + pincpz*pincpz); // [GeV/c]
+
     auto const p_prod = std::sqrt(prod.startpx*prod.startpx +
                                   prod.startpy*prod.startpy +
                                   prod.startpz*prod.startpz); // [GeV/c]
 
-    const double pprodpx = is_old_g4 ? ancestors[i - 1].pprodpx : prod.pprodpx;
-    const double pprodpy = is_old_g4 ? ancestors[i - 1].pprodpy : prod.pprodpy;
-    const double pprodpz = is_old_g4 ? ancestors[i - 1].pprodpz : prod.pprodpz;
-
-    const double p_inc = std::sqrt(pprodpx*pprodpx + pprodpy*pprodpy + pprodpz*pprodpz); // [GeV/c]
-
     if (p_prod == 0. || p_inc == 0.) continue;
 
-    const double costh = clip((prod.startpx*pprodpx +
-                               prod.startpy*pprodpy +
-                               prod.startpz*pprodpz) / (p_prod*p_inc));
+    const double costh = clip((prod.startpx*pincpx +
+                               prod.startpy*pincpy +
+                               prod.startpz*pincpz) / (p_prod*p_inc));
 
     // Calculate the produced particle's longitudinal momentum in the lab frame
     const double pz = p_prod*costh;
