@@ -166,12 +166,18 @@ def main() -> None:
     set_ROOT_opts(args.mt)
 
     for name, files in cfg["file_sets"].items():
+        parent_dir, pattern = files.rsplit("/", 1)
+        n_files = len(list(Path(parent_dir).glob(pattern)))
+        logging.info(f"Found {n_files} files in {parent_dir}")
+        if n_files == 0:
+            logging.error(f"Skipping {name} as no files were found...")
+            continue
+
         tree_name = f"fluxTree_{name}"
         run_analysis(
             files, str(out_fname), tree_name, cfg, debug=args.debug
         )
 
-    for name, files in cfg["file_sets"].items():
         pot = get_pot(files, cfg["pot_per_file"])
         hpot = ROOT.TH1D(f"hpot_{name}", "POT", 1, 0, 1)  # type: ignore
         hpot.SetBinContent(1, pot)
