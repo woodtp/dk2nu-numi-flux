@@ -5,8 +5,15 @@ output_file = "output.root"
 
 pot_per_file = 500_000
 
+# list of branches to save in the tree. No Tree is saved if this is empty. If set to ["*"], all branches are saved.
+save_branches = ["nu_pdg", "nu_energy", "weight"]
+# save_branches = ["*"]
+# save_branches = []
+
 [file_sets]
-fhc = "/pnfs/icarus/persistent/users/awood/2024-06-27_numi_beamsim_g4.10/me000z200i/run0/g4numi*.root"
+# fhc = "/pnfs/icarus/persistent/users/awood/2024-06-27_numi_beamsim_g4.10/me000z200i/run0/g4numi*.root"
+fhc = "/pnfs/numix/scratch/users/bnayak/g4numi_g4_10_4_p02d_nothresh/me000z200i/run0/files/g4numi*.root"
+
 
 [aliases]
 # Rename quantities for easier access.

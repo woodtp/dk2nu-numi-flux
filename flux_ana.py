@@ -86,8 +86,8 @@ def run_analysis(
     #         logging.info(f"Writing histogram {h.GetName()} to {out_fname}...")
     #         h.Write()
 
-    tree_log_str = f"Preparing Tree '{tree_name}' with branches:\n\n"
-    for branch in cfg["definitions"].keys():
+    tree_log_str = f"Preparing Tree '{tree_name}' with {len(cfg['save_branches'])} branches:\n\n"
+    for branch in cfg["save_branches"]:
         tree_log_str += "* " + branch + "\n"
 
     opts = ROOT.RDF.RSnapshotOptions()  # type: ignore
@@ -99,7 +99,12 @@ def run_analysis(
         f"Snapshotting to {out_fname}. Event loop will be executed now, this might take a while..."
     )
 
-    df.Snapshot(tree_name, out_fname, cfg["definitions"].keys(), opts)  # type: ignore
+    if len(cfg["save_branches"]) == 1 and cfg["save_branches"][0] == "*":
+        df.Snapshot(tree_name, out_fname, list(cfg["aliases"].keys()) + list(cfg["definitions"].keys()), opts)
+    elif len(cfg["save_branches"]) > 0:
+        df.Snapshot(tree_name, out_fname, cfg["save_branches"], opts)  # type: ignore
+    else:
+        logging.info("Not saving any branches. Exiting...")
 
 
 def load_file(fname: str) -> ROOT.RDataFrame:  # type: ignore
