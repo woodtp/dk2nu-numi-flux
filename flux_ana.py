@@ -20,6 +20,10 @@ def get_pot(files: str, pot_per_file: int) -> int:
     path, pattern = files.rsplit("/", 1)
     nfiles = len(list(Path(path).glob(pattern)))
     return pot_per_file * nfiles
+    # This is the more 'proper' way to calculate POT, but it's slow
+    # df = ROOT.RDataFrame("dkmetaTree", files)
+    # pot = df.Sum("pots").GetValue()
+    # return pot
 
 
 def run_analysis(
@@ -54,6 +58,11 @@ def run_analysis(
 
     logging.debug(f"Location: {det_loc}")
 
+    pot = get_pot(in_fname, cfg["pot_per_file"])
+
+    df = df.Define("pot_wgt", f"1.0 / {pot}")
+    logging.info(f"POT weight available as 'pot_wgt' = {1/pot:e}")
+
     df = df.Define("det_loc", f"ROOT::RVec<double>{{ {det_loc[0]}, {det_loc[1]}, {det_loc[2]} }}")
 
     for key, val in cfg["aliases"].items():
@@ -68,47 +77,72 @@ def run_analysis(
         logging.debug(f"Applying filter: {val}")
         df = df.Filter(val)
 
-    # opts.fCompressionAlgorithm = ROOT.kLZMA
-    # opts.fCompressionLevel = 9
-
-    # TODO: Allow for histograms to be defined in the config file.
-    # df = df.Filter("nu_pdg == 12")
-    #
-    # hists = [
-    #     df.Histo1D(("hnom_numu", "#nu_{e}", 60, 0, 6), "nu_energy", "weight"),
-    #     # df.Filter("parent_pdg == 211").Histo1D(("hnom_numu_pip", "#pi^{+} #to #nu_{e}", 60, 0, 6), "nu_energy", "weight"),
-    #     df.Filter("parent_pdg == 321").Histo1D(("hnom_numu_Kp", "K^{+} #to #nu_{e}", 60, 0, 6), "nu_energy", "weight"),
-    #     df.Filter("parent_pdg == -13").Histo1D(("hnom_numu_mup", "#mu^{+} #to #nu_{e}", 60, 0, 6), "nu_energy", "weight"),
-    # ]
-    #
-    # with ROOT.TFile.Open(out_fname, "UPDATE") as _:  # type: ignore
-    #     for h in hists:
-    #         logging.info(f"Writing histogram {h.GetName()} to {out_fname}...")
-    #         h.Write()
-
     tree_log_str = f"Preparing Tree '{tree_name}' with {len(cfg['save_branches'])} branches:\n\n"
     for branch in cfg["save_branches"]:
         tree_log_str += "* " + branch + "\n"
 
+    hists = []
+    for i, (name, h) in enumerate(cfg["histograms"].items()):
+        if (key := h.get("copy_from")) is not None:
+            h = cfg["histograms"][key]
+            # apply any overrides
+            h.update(cfg["histograms"][name])
+
+        if h.get("filter") is not None:
+            wgt_def = f"({h['weight']})*({h['filter']})"
+            weight = f"weight_{i}"
+            df = df.Define(weight, wgt_def)
+        else:
+            weight = h["weight"]
+
+        if (dir := h.get("dir")) is not None:
+            name = f"{dir}/{name}"
+
+        if h.get("xvar") is not None and h.get("yvar") is not None:
+            hists.append(df.Histo2D((name, h["title"], h["xbins"], h["xlow"], h["xhigh"], h["ybins"], h["ylow"], h["yhigh"]), h["xvar"], h["yvar"], weight))
+        else:
+            hists.append(df.Histo1D((name, h["title"], h["bins"], h["low"], h["high"]), h["var"], weight))
+
     opts = ROOT.RDF.RSnapshotOptions()  # type: ignore
     opts.fMode = "UPDATE"
 
-    logging.info(tree_log_str)
-
-    logging.info(
-        f"Snapshotting to {out_fname}. Event loop will be executed now, this might take a while..."
-    )
-
     if len(cfg["save_branches"]) == 1 and cfg["save_branches"][0] == "*":
+        logging.info(tree_log_str)
+        logging.info(
+            f"Snapshotting to {out_fname}. Event loop will be executed now, this might take a while..."
+        )
         df.Snapshot(tree_name, out_fname, list(cfg["aliases"].keys()) + list(cfg["definitions"].keys()), opts)
     elif len(cfg["save_branches"]) > 0:
+        logging.info(tree_log_str)
+        logging.info(
+            f"Snapshotting to {out_fname}. Event loop will be executed now, this might take a while..."
+        )
         df.Snapshot(tree_name, out_fname, cfg["save_branches"], opts)  # type: ignore
     else:
-        logging.info("Not saving any branches. Exiting...")
+        logging.info("Not saving any branches.")
 
+    with ROOT.TFile.Open(out_fname, "UPDATE") as f:
+        name = tree_name.split('_')[-1]
 
-def load_file(fname: str) -> ROOT.RDataFrame:  # type: ignore
-    return ROOT.RDataFrame("fluxTree", fname)  # type: ignore
+        hpot = ROOT.TH1D(f"hpot_{name}", "POT", 1, 0, 1)  # type: ignore
+        hpot.SetBinContent(1, pot)
+
+        logging.info(f"POT = {pot:_}. Writing to {out_fname}:{hpot.GetName()}")
+
+        f.WriteObject(hpot, hpot.GetName())
+
+        for h in hists:
+            logging.info(f"Writing histogram {h.GetName()} to {out_fname}...")
+            f.cd()
+            d = ROOT.gDirectory
+            name = h.GetName()
+            if "/" in name:
+                dir, name = h.GetName().rsplit("/", 1)
+                if not f.GetDirectory(dir):
+                    d = f.mkdir(dir)
+                d = f.GetDirectory(dir)
+                d.cd()
+            d.WriteObject(h.GetPtr(), name)
 
 
 def main() -> None:
@@ -177,13 +211,6 @@ def main() -> None:
         run_analysis(
             files, str(out_fname), tree_name, cfg, debug=args.debug
         )
-
-        pot = get_pot(files, cfg["pot_per_file"])
-        hpot = ROOT.TH1D(f"hpot_{name}", "POT", 1, 0, 1)  # type: ignore
-        hpot.SetBinContent(1, pot)
-        logging.info(f"POT = {pot:_}. Writing to {out_fname}:{hpot.GetName()}")
-        with ROOT.TFile.Open(str(out_fname), "UPDATE") as _:  # type: ignore
-            hpot.Write()
 
 
 if __name__ == "__main__":

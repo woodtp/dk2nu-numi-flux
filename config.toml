@@ -6,13 +6,16 @@ output_file = "output.root"
 pot_per_file = 500_000
 
 # list of branches to save in the tree. No Tree is saved if this is empty. If set to ["*"], all branches are saved.
-save_branches = ["nu_pdg", "nu_energy", "weight"]
+# save_branches = ["nu_pdg", "nu_energy", "weight"]
 # save_branches = ["*"]
-# save_branches = []
+save_branches = []
 
 [file_sets]
 # fhc = "/pnfs/icarus/persistent/users/awood/2024-06-27_numi_beamsim_g4.10/me000z200i/run0/g4numi*.root"
-fhc = "/pnfs/numix/scratch/users/bnayak/g4numi_g4_10_4_p02d_nothresh/me000z200i/run0/files/g4numi*.root"
+run0_fhc = "/pnfs/icarus/persistent/users/awood/g4numi_g4_10_4_p02d_nothresh/me000z200i/run0/files/g4numi*.root"
+# run1_fhc = "/pnfs/icarus/persistent/users/awood/g4numi_g4_10_4_p02d_nothresh/me000z200i/run1/files/g4numi*.root"
+# run2_fhc = "/pnfs/icarus/persistent/users/awood/g4numi_g4_10_4_p02d_nothresh/me000z200i/run2/files/g4numi*.root"
+# run3_fhc = "/pnfs/icarus/persistent/users/awood/g4numi_g4_10_4_p02d_nothresh/me000z200i/run3/files/g4numi*.root"
 
 
 [aliases]
@@ -35,8 +38,16 @@ no_dar = "parent_momentum > 0."
 [definitions]
 # Define quantities to calculate
 # see ROOT::RDataFrame::Define
+is_numu           = "nu_pdg == 14"
+is_numubar        = "nu_pdg == -14"
+is_nue            = "nu_pdg == 12"
+is_nuebar	      = "nu_pdg == -12"
+is_pipm           = "abs(parent_pdg) == 211"
+is_Kpm            = "abs(parent_pdg) == 321"
+is_muon           = "abs(parent_pdg) == 13"
+is_K0             = "parent_pdg == 310 || parent_pdg == 130"
 parent_momentum   = "sqrt(pdpx*pdpx + pdpy*pdpy + pdpz*pdpz)"
-ancestor_vol      = "get_volumes(dk2nu.ancestor)"
+# ancestor_vol      = "get_volumes(dk2nu.ancestor)"
 decay_vertex      = "ROOT::RVec<double>{vx, vy, vz}"
 rr                = "det_loc - decay_vertex"
 v_parent_momentum = "ROOT::RVec<double>{pdpx, pdpy, pdpz}"
@@ -47,8 +58,9 @@ parent_energy     = "Numba::calc_energy(v_parent_momentum, parent_mass)"  # Calc
 pgamma            = "Numba::calc_gamma(parent_energy, parent_mass)"       # Calculate the gamma factor of the parent particle
 emrat             = "Numba::calc_energy_in_beam(pgamma, costh)"           # Weighted neutrino energy in the lab frame. Small angle approximation.
 nu_energy         = "dk2nu.decay.necm * emrat"                            # Lorentz boost the neutrino energy into the lab frame
-weight            = "calc_weight(dk2nu.decay, sangdet, emrat, parent_energy, nu_energy, pgamma, rr)"
-# theta_p = "Numba::theta_p(v_parent_momentum, det_loc)"
+flux_wgt          = "calc_weight(dk2nu.decay, sangdet, emrat, parent_energy, nu_energy, pgamma, rr)"
+flux_wgt_POT      = "pot_wgt*flux_wgt"
+theta_p           = "Numba::theta_p(v_parent_momentum, det_loc)"
 # par_codes = "Numba::parent_to_code(dk2nu.ancestor.pdg)"
 # target_codes = "Numba::target_to_code(dk2nu.ancestor.nucleus)"
 # ancestor_parent_pdg = "Numba::ancestor_parent_pdg(dk2nu.ancestor.pdg)"
@@ -60,3 +72,158 @@ weight            = "calc_weight(dk2nu.decay, sangdet, emrat, parent_energy, nu_
 # ancestor_pT = "calc_pT(dk2nu.ancestor)"
 # ancestor_xF = "calc_xF(dk2nu.ancestor, ancestor_mass)"
 
+[histograms]
+# Define histograms to create
+# see ROOT::RDataFrame::Histo1D or ::Histo2D
+
+# Flux vs. Neutrino Energy Spectra
+
+[histograms.h_Enu_numu]
+dir = "flux_Enu"
+title = "#nu_{#mu};E_{#nu} [GeV];d#Phi/dE_{#nu} [m^{-2} POT^{-1}]"
+bins = 200
+low = 0
+high = 20
+var = "nu_energy"
+weight = "flux_wgt_POT"
+filter = "is_numu"
+
+[histograms.h_Enu_numu_pipm]
+copy_from = "h_Enu_numu"
+title = "#pi^{+} #rightarrow #nu_{#mu};E_{#nu} [GeV];d#Phi/dE_{#nu} [m^{-2} POT^{-1}]"
+filter = "is_numu*is_pipm"
+
+[histograms.h_Enu_numu_Kpm]
+copy_from = "h_Enu_numu"
+title = "K^{+} #rightarrow #nu_{#mu};E_{#nu} [GeV];d#Phi/dE_{#nu} [m^{-2} POT^{-1}]"
+filter = "is_numu*is_Kpm"
+
+[histograms.h_Enu_numu_K0]
+copy_from = "h_Enu_numu"
+title = "K^{0}_{L} #rightarrow #nu_{#mu};E_{#nu} [GeV];d#Phi/dE_{#nu} [m^{-2} POT^{-1}]"
+filter = "is_numu*is_K0"
+
+[histograms.h_Enu_numu_mupm]
+copy_from = "h_Enu_numu"
+title = "#mu^{-} #rightarrow #nu_{#mu};E_{#nu} [GeV];d#Phi/dE_{#nu} [m^{-2} POT^{-1}]"
+filter = "is_numu*is_muon"
+
+[histograms.h_Enu_numubar]
+copy_from = "h_Enu_numu"
+title = "#bar{#nu}_{#mu};E_{#nu} [GeV];d#Phi/dE_{#nu} [m^{-2} POT^{-1}]"
+filter = "is_numubar"
+
+[histograms.h_Enu_numubar_pipm]
+copy_from = "h_Enu_numu"
+title = "#pi^{+} #rightarrow #bar{#nu}_{#mu};E_{#nu} [GeV];d#Phi/dE_{#nu} [m^{-2} POT^{-1}]"
+filter = "is_numubar*is_pipm"
+
+[histograms.h_Enu_numubar_Kpm]
+copy_from = "h_Enu_numu"
+title = "K^{+} #rightarrow #bar{#nu}_{#mu};E_{#nu} [GeV];d#Phi/dE_{#nu} [m^{-2} POT^{-1}]"
+filter = "is_numubar*is_Kpm"
+
+[histograms.h_Enu_numubar_K0]
+copy_from = "h_Enu_numu"
+title = "K^{0}_{L} #rightarrow #bar{#nu}_{#mu};E_{#nu} [GeV];d#Phi/dE_{#nu} [m^{-2} POT^{-1}]"
+filter = "is_numubar*is_K0"
+
+[histograms.h_Enu_numubar_mupm]
+copy_from = "h_Enu_numu"
+title = "#mu^{+} #rightarrow #bar{#nu}_{#mu};E_{#nu} [GeV];d#Phi/dE_{#nu} [m^{-2} POT^{-1}]"
+filter = "is_numubar*is_muon"
+
+[histograms.h_Enu_nue]
+copy_from = "h_Enu_numu"
+title = "#nu_{e};E_{#nu} [GeV];d#Phi/dE_{#nu} [m^{-2} POT^{-1}]"
+filter = "is_nue"
+
+[histograms.h_Enu_nue_Kpm]
+copy_from = "h_Enu_numu"
+title = "K^{+} #rightarrow #nu_{e};E_{#nu} [GeV];d#Phi/dE_{#nu} [m^{-2} POT^{-1}]"
+filter = "is_nue*is_Kpm"
+
+[histograms.h_Enu_nue_K0]
+copy_from = "h_Enu_numu"
+title = "K^{0}_{L} #rightarrow #nu_{e};E_{#nu} [GeV];d#Phi/dE_{#nu} [m^{-2} POT^{-1}]"
+filter = "is_nue*is_K0"
+
+[histograms.h_Enu_nue_mupm]
+copy_from = "h_Enu_numu"
+title = "#mu^{-} #rightarrow #nu_{e};E_{#nu} [GeV];d#Phi/dE_{#nu} [m^{-2} POT^{-1}]"
+filter = "is_nue*is_muon"
+
+[histograms.h_Enu_nuebar]
+copy_from = "h_Enu_numu"
+title = "#bar{#nu}_{e};E_{#nu} [GeV];d#Phi/dE_{#nu} [m^{-2} POT^{-1}]"
+filter = "is_nuebar"
+
+[histograms.h_Enu_nuebar_Kpm]
+copy_from = "h_Enu_numu"
+title = "K^{+} #rightarrow #bar{#nu}_{e};E_{#nu} [GeV];d#Phi/dE_{#nu} [m^{-2} POT^{-1}]"
+filter = "is_nuebar*is_Kpm"
+
+[histograms.h_Enu_nuebar_K0]
+copy_from = "h_Enu_numu"
+title = "K^{0}_{L} #rightarrow #bar{#nu}_{e};E_{#nu} [GeV];d#Phi/dE_{#nu} [m^{-2} POT^{-1}]"
+filter = "is_nuebar*is_K0"
+
+[histograms.h_Enu_nuebar_mupm]
+copy_from = "h_Enu_numu"
+title = "#mu^{+} #rightarrow #bar{#nu}_{e};E_{#nu} [GeV];d#Phi/dE_{#nu} [m^{-2} POT^{-1}]"
+filter = "is_nuebar*is_muon"
+
+## Parent decay momentum angle w.r.t. NuMI beam direction
+
+[histograms.h_thetapar_numu_pipm]
+dir = "parent_angle"
+title = "#pi^{+} #rightarrow #nu_{#mu};#theta_{p} [mrad];d#Phi/d#theta_{p} [m^{-2} mrad^{-1} POT^{-1}]"
+bins = 100
+low = -500
+high = 500
+var = "theta_p"
+weight = "flux_wgt_POT"
+filter = "is_numu*is_pipm"
+
+[histograms.h_thetapar_numu_Kpm]
+copy_from = "h_thetapar_numu_pipm"
+title = "K^{+} #rightarrow #nu_{#mu};#theta_{p} [mrad];d#Phi/d#theta_{p} [m^{-2} mrad^{-1} POT^{-1}]"
+filter = "is_numu*is_Kpm"
+
+[histograms.h_thetapar_numu_K0]
+copy_from = "h_thetapar_numu_pipm"
+title = "K^{0}_{L} #rightarrow #nu_{#mu};#theta_{p} [mrad];d#Phi/d#theta_{p} [m^{-2} mrad^{-1} POT^{-1}]"
+filter = "is_numu*is_K0"
+
+[histograms.h_thetapar_numu_mupm]
+copy_from = "h_thetapar_numu_pipm"
+title = "#mu^{-} #rightarrow #nu_{#mu};#theta_{p} [mrad];d#Phi/d#theta_{p} [m^{-2} mrad^{-1} POT^{-1}]"
+filter = "is_numu*is_muon"
+
+[histograms.h_thetapar_nue_Kpm]
+copy_from = "h_thetapar_numu_pipm"
+title = "K^{+} #rightarrow #nu_{e};#theta_{p} [mrad];d#Phi/d#theta_{p} [m^{-2} mrad^{-1} POT^{-1}]"
+filter = "is_nue*is_Kpm"
+
+[histograms.h_thetapar_nue_K0]
+copy_from = "h_thetapar_numu_pipm"
+title = "K^{0}_{L} #rightarrow #nu_{e};#theta_{p} [mrad];d#Phi/d#theta_{p} [m^{-2} mrad^{-1} POT^{-1}]"
+filter = "is_nue*is_K0"
+
+[histograms.h_thetapar_nue_mupm]
+copy_from = "h_thetapar_numu_pipm"
+title = "#mu^{-} #rightarrow #nu_{e};#theta_{p} [mrad];d#Phi/d#theta_{p} [m^{-2} mrad^{-1} POT^{-1}]"
+filter = "is_nue*is_muon"
+
+# [histograms.h_thetapar_Enu_numu_Kpm]
+# title = "h_thetapar_Enu_numu_Kpm;#theta_{parent};E_{#nu} [GeV]"
+# xbins = 300
+# xlow  = -15
+# xhigh = 15
+# ybins = 200
+# ylow  = 0
+# yhigh = 20
+# xvar = "theta_p"
+# yvar = "nu_energy"
+# weight = "weight"
+# filter = "is_numu*is_Kpm"
