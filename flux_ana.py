@@ -9,12 +9,15 @@ from pathlib import Path
 from typing import Any
 
 import ROOT  # type: ignore
-import toml
+
+if sys.version_info >= (3, 11):
+    import tomllib
+else:
+    import tomli as tomllib
+
+import numpy as np
 
 logging.basicConfig(level=logging.INFO, format="[%(levelname)s] %(message)s")
-
-# from spectra_definitions import apply_defs
-
 
 def get_pot(files: str, pot_per_file: int) -> int:
     path, pattern = files.rsplit("/", 1)
@@ -29,7 +32,7 @@ def get_pot(files: str, pot_per_file: int) -> int:
 def run_analysis(
     in_fname: str,
     out_fname: str,
-    tree_name: str,
+    sample_name: str,
     cfg: dict[str, Any],
     debug: bool = False,
 ) -> None:
@@ -61,7 +64,7 @@ def run_analysis(
     pot = get_pot(in_fname, cfg["pot_per_file"])
 
     df = df.Define("pot_wgt", f"1.0 / {pot}")
-    logging.info(f"POT weight available as 'pot_wgt' = {1/pot:e}")
+    logging.info(f"POT = {pot:_}. Weight available as 'pot_wgt' = 1/POT = {1/pot:e}")
 
     df = df.Define("det_loc", f"ROOT::RVec<double>{{ {det_loc[0]}, {det_loc[1]}, {det_loc[2]} }}")
 
@@ -77,13 +80,21 @@ def run_analysis(
         logging.debug(f"Applying filter: {val}")
         df = df.Filter(val)
 
+    tree_name = f"fluxTree_{sample_name}"
     tree_log_str = f"Preparing Tree '{tree_name}' with {len(cfg['save_branches'])} branches:\n\n"
     for branch in cfg["save_branches"]:
         tree_log_str += "* " + branch + "\n"
 
+    def _is_regular_bins(bins):
+        return len(bins) == 3 and all(isinstance(x, int) or isinstance(x, float) for x in bins)
+
+    def _is_variable_bins(bins):
+        return all(isinstance(x, list) and len(x) == 3 for x in bins)
+
     hists = []
     for i, (name, h) in enumerate(cfg["histograms"].items()):
         if (key := h.get("copy_from")) is not None:
+            logging.debug(f"Copying histogram params from {key} to {name}")
             h = cfg["histograms"][key]
             # apply any overrides
             h.update(cfg["histograms"][name])
@@ -98,10 +109,70 @@ def run_analysis(
         if (dir := h.get("dir")) is not None:
             name = f"{dir}/{name}"
 
-        if h.get("xvar") is not None and h.get("yvar") is not None:
-            hists.append(df.Histo2D((name, h["title"], h["xbins"], h["xlow"], h["xhigh"], h["ybins"], h["ylow"], h["yhigh"]), h["xvar"], h["yvar"], weight))
+        # checking whether it's a 1D or 2D histogram
+        if "yvar" not in h:
+            if _is_regular_bins(h["bins"]):
+                nbins, low, high = h["bins"]
+
+                logging.debug(f"Creating 1D histogram {name} with {nbins} bins from {low} to {high}")
+
+                hists.append(df.Histo1D((name, h["title"], nbins, low, high), h["var"], weight))
+            elif _is_variable_bins(h["bins"]):
+                bins = np.array([])
+                for bs in h["bins"]:
+                    low, high, step = bs
+                    bins = np.append(bins, np.arange(low, high+step, step))
+
+                logging.debug(f"Creating 1D histogram {name} with variable bins:\n{bins}")
+
+                hists.append(df.Histo1D((name, h["title"], len(bins) - 1, bins), h["var"], weight))
+            else:
+                raise ValueError(f"Invalid binning format for histogram {name}. Exiting...")
         else:
-            hists.append(df.Histo1D((name, h["title"], h["bins"], h["low"], h["high"]), h["var"], weight))
+            if _is_regular_bins(h["xbins"]) and _is_regular_bins(h["ybins"]):
+                nbinsx, xlow, xhigh = h["xbins"]
+                nbinsy, ylow, yhigh = h["ybins"]
+
+                hists.append(df.Histo2D((name, h["title"], nbinsx, xlow, xhigh, nbinsy, ylow, yhigh), h["xvar"], h["yvar"], weight))
+            elif _is_variable_bins(h["xbins"]) and _is_regular_bins(h["ybins"]):
+                xbins = np.array([])
+
+                for bs in h["xbins"]:
+                    low, high, step = bs
+                    xbins = np.append(xbins, np.arange(low, high+step, step))
+
+                nbinsy, ylow, yhigh = h["ybins"]
+
+                logging.debug(f"Creating 2D histogram {name} with variable x bins:\n{xbins} and {nbinsy} regular y bins from {ylow} to {yhigh}")
+
+                hists.append(df.Histo2D((name, h["title"], len(xbins)-1, xbins, nbinsy, ylow, yhigh), h["xvar"], h["yvar"], weight))
+            elif _is_regular_bins(h["xbins"]) and _is_variable_bins(h["ybins"]):
+                nbinsx, xlow, xhigh = h["xbins"]
+
+                ybins = np.array([])
+
+                for bs in h["ybins"]:
+                    low, high, step = bs
+                    ybins = np.append(ybins, np.arange(low, high+step, step))
+
+                logging.debug(f"Creating 2D histogram {name} with variable y bins:\n{ybins} and {nbinsx} regular x bins from {xlow} to {xhigh}")
+
+                hists.append(df.Histo2D((name, h["title"], nbinsx, xlow, xhigh, len(ybins)-1, ybins), h["xvar"], h["yvar"], weight))
+            elif _is_variable_bins(h["xbins"]) and _is_variable_bins(h["ybins"]):
+                xbins = np.array([])
+                for bs in h["xbins"]:
+                    low, high, step = bs
+                    xbins = np.append(xbins, np.arange(low, high+step, step))
+
+                ybins = np.array([])
+                for bs in h["ybins"]:
+                    low, high, step = bs
+                    ybins = np.append(ybins, np.arange(low, high+step, step))
+
+                logging.debug(f"Creating 2D histogram {name} with variable x and y bins:\n{xbins}\n and\n{ybins}")
+                hists.append(df.Histo2D((name, h["title"], len(xbins)-1, xbins, len(ybins)-1, ybins), h["xvar"], h["yvar"], weight))
+            else:
+                raise ValueError(f"Invalid binning format for histogram {name}. Exiting...")
 
     opts = ROOT.RDF.RSnapshotOptions()  # type: ignore
     opts.fMode = "UPDATE"
@@ -121,26 +192,29 @@ def run_analysis(
     else:
         logging.info("Not saving any branches.")
 
-    with ROOT.TFile.Open(out_fname, "UPDATE") as f:
-        name = tree_name.split('_')[-1]
+    with ROOT.TFile.Open(out_fname, "UPDATE") as f:  # type: ignore
+        sample_dir = f.mkdir(sample_name)
+        sample_dir.cd()
 
-        hpot = ROOT.TH1D(f"hpot_{name}", "POT", 1, 0, 1)  # type: ignore
+        hpot = ROOT.TH1D("hpot", "POT", 1, 0, 1)  # type: ignore
         hpot.SetBinContent(1, pot)
 
-        logging.info(f"POT = {pot:_}. Writing to {out_fname}:{hpot.GetName()}")
+        logging.info(f"Writing POT to {out_fname}:{sample_dir}/{hpot.GetName()}")
 
-        f.WriteObject(hpot, hpot.GetName())
+        sample_dir.WriteObject(hpot, hpot.GetName())
 
+        logging.info("If the event loop hasn't already been triggered. It will be be now, for sure. :)")
         for h in hists:
             logging.info(f"Writing histogram {h.GetName()} to {out_fname}...")
-            f.cd()
-            d = ROOT.gDirectory
+            sample_dir.cd()
+            d = ROOT.gDirectory  # type: ignore
             name = h.GetName()
             if "/" in name:
                 dir, name = h.GetName().rsplit("/", 1)
-                if not f.GetDirectory(dir):
-                    d = f.mkdir(dir)
-                d = f.GetDirectory(dir)
+                if not sample_dir.GetDirectory(dir):
+                    d = sample_dir.mkdir(dir)
+                else:
+                    d = sample_dir.GetDirectory(dir)
                 d.cd()
             d.WriteObject(h.GetPtr(), name)
 
@@ -174,7 +248,8 @@ def main() -> None:
         logging.error("Could not find config.toml. Exiting...")
         sys.exit(1)
 
-    cfg = toml.load(args.config)
+    with open(args.config, "rb") as f:
+        cfg = tomllib.load(f)
 
     from root_declarations import set_ROOT_opts
 
@@ -199,18 +274,18 @@ def main() -> None:
 
     set_ROOT_opts(args.mt)
 
-    for name, files in cfg["file_sets"].items():
+    for sample_name, files in cfg["file_sets"].items():
         parent_dir, pattern = files.rsplit("/", 1)
+
         n_files = len(list(Path(parent_dir).glob(pattern)))
+
         logging.info(f"Found {n_files} files in {parent_dir}")
+
         if n_files == 0:
-            logging.error(f"Skipping {name} as no files were found...")
+            logging.error(f"Skipping {sample_name} as no files were found...")
             continue
 
-        tree_name = f"fluxTree_{name}"
-        run_analysis(
-            files, str(out_fname), tree_name, cfg, debug=args.debug
-        )
+        run_analysis(files, str(out_fname), sample_name, cfg, debug=args.debug)
 
 
 if __name__ == "__main__":

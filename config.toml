@@ -81,9 +81,7 @@ theta_p           = "Numba::theta_p(v_parent_momentum, det_loc)"
 [histograms.h_Enu_numu]
 dir = "flux_Enu"
 title = "#nu_{#mu};E_{#nu} [GeV];d#Phi/dE_{#nu} [m^{-2} POT^{-1}]"
-bins = 200
-low = 0
-high = 20
+bins = [200, 0, 20]
 var = "nu_energy"
 weight = "flux_wgt_POT"
 filter = "is_numu"
@@ -173,14 +171,12 @@ copy_from = "h_Enu_numu"
 title = "#mu^{+} #rightarrow #bar{#nu}_{e};E_{#nu} [GeV];d#Phi/dE_{#nu} [m^{-2} POT^{-1}]"
 filter = "is_nuebar*is_muon"
 
-## Parent decay momentum angle w.r.t. NuMI beam direction
+# Parent decay momentum angle w.r.t. NuMI beam direction
 
 [histograms.h_thetapar_numu_pipm]
 dir = "parent_angle"
 title = "#pi^{+} #rightarrow #nu_{#mu};#theta_{p} [mrad];d#Phi/d#theta_{p} [m^{-2} mrad^{-1} POT^{-1}]"
-bins = 100
-low = -500
-high = 500
+bins = [100, -500, 500]
 var = "theta_p"
 weight = "flux_wgt_POT"
 filter = "is_numu*is_pipm"
@@ -215,15 +211,12 @@ copy_from = "h_thetapar_numu_pipm"
 title = "#mu^{-} #rightarrow #nu_{e};#theta_{p} [mrad];d#Phi/d#theta_{p} [m^{-2} mrad^{-1} POT^{-1}]"
 filter = "is_nue*is_muon"
 
-# [histograms.h_thetapar_Enu_numu_Kpm]
-# title = "h_thetapar_Enu_numu_Kpm;#theta_{parent};E_{#nu} [GeV]"
-# xbins = 300
-# xlow  = -15
-# xhigh = 15
-# ybins = 200
-# ylow  = 0
-# yhigh = 20
-# xvar = "theta_p"
-# yvar = "nu_energy"
-# weight = "weight"
-# filter = "is_numu*is_Kpm"
+[histograms.h_thetapar_Enu_numu_Kpm]
+dir = "parent_angle"
+title = "h_thetapar_Enu_numu_Kpm;#theta_{parent} [mrad];E_{#nu} [GeV]"
+xbins = [1000, -500.0, 500.0]
+ybins = [100, 0, 10]
+xvar = "theta_p"
+yvar = "nu_energy"
+weight = "flux_wgt_POT"
+filter = "is_numu*is_Kpm"
