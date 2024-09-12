@@ -99,12 +99,15 @@ def run_analysis(
             # apply any overrides
             h.update(cfg["histograms"][name])
 
+        weight = h.get("weight", "")
+
         if h.get("filter") is not None:
-            wgt_def = f"({h['weight']})*({h['filter']})"
+            if weight == "":
+                wgt_def = f"{h['filter']}"
+            else:
+                wgt_def = f"({h['weight']})*({h['filter']})"
             weight = f"weight_{i}"
             df = df.Define(weight, wgt_def)
-        else:
-            weight = h["weight"]
 
         if (dir := h.get("dir")) is not None:
             name = f"{dir}/{name}"
