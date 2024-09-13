@@ -147,7 +147,7 @@ def calc_costheta_par(parent_momentum: np.ndarray, rr: np.ndarray) -> float:
 @ROOT.Numba.Declare(["RVec<double>", "RVec<double>"], "double")  # type: ignore
 def theta_p(p: np.ndarray, det_loc: np.ndarray) -> float:
     """
-    Calculate the angle (in degrees) between a momentum vector and NuMI within the plane
+    Calculate the angle (in mrad) between a momentum vector and NuMI within the plane
     connecting the detector location and the NuMI axis.
     If the provided location is colinear with the beam axis, the angle is calculated with respect to the x-z plane.
     If the input momentum vector is zero, the function returns -9999.0.
@@ -180,14 +180,13 @@ def theta_p(p: np.ndarray, det_loc: np.ndarray) -> float:
 
     projection = p - proj_mag * n
 
-    costh = (projection @ numi_axis) / np.sum(projection**2)
-    theta = np.degrees(np.arccos(costh))
+    costh = (projection @ numi_axis) / np.sqrt(np.sum(projection**2))
+    theta = np.arccos(costh)
 
     crossprod = np.cross(projection, numi_axis)
     if (crossprod @ n) < 0:
         theta = -theta
-    return theta
-
+    return 1000*theta
 
 @ROOT.Numba.Declare(["RVec<int>"], "RVec<int>")  # type: ignore
 def parent_to_code(parents: np.ndarray) -> np.ndarray:

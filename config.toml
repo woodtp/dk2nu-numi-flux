@@ -6,13 +6,12 @@ output_file = "output.root"
 pot_per_file = 500_000
 
 # list of branches to save in the tree. No Tree is saved if this is empty. If set to ["*"], all branches are saved.
-save_branches = ["nu_pdg", "nu_energy", "weight"]
+# save_branches = ["nu_pdg", "nu_energy", "weight"]
 # save_branches = ["*"]
-# save_branches = []
+save_branches = []
 
 [file_sets]
-# fhc = "/pnfs/icarus/persistent/users/awood/2024-06-27_numi_beamsim_g4.10/me000z200i/run0/g4numi*.root"
-fhc = "/pnfs/numix/scratch/users/bnayak/g4numi_g4_10_4_p02d_nothresh/me000z200i/run0/files/g4numi*.root"
+run0_fhc = "/path/to/my/files/*.root" ## OVERRIDE THIS
 
 
 [aliases]
@@ -35,8 +34,15 @@ no_dar = "parent_momentum > 0."
 [definitions]
 # Define quantities to calculate
 # see ROOT::RDataFrame::Define
+is_numu           = "nu_pdg == 14"
+is_numubar        = "nu_pdg == -14"
+is_nue            = "nu_pdg == 12"
+is_nuebar	      = "nu_pdg == -12"
+is_pipm           = "abs(parent_pdg) == 211"
+is_Kpm            = "abs(parent_pdg) == 321"
+is_muon           = "abs(parent_pdg) == 13"
+is_K0             = "parent_pdg == 310 || parent_pdg == 130"
 parent_momentum   = "sqrt(pdpx*pdpx + pdpy*pdpy + pdpz*pdpz)"
-ancestor_vol      = "get_volumes(dk2nu.ancestor)"
 decay_vertex      = "ROOT::RVec<double>{vx, vy, vz}"
 rr                = "det_loc - decay_vertex"
 v_parent_momentum = "ROOT::RVec<double>{pdpx, pdpy, pdpz}"
@@ -47,10 +53,12 @@ parent_energy     = "Numba::calc_energy(v_parent_momentum, parent_mass)"  # Calc
 pgamma            = "Numba::calc_gamma(parent_energy, parent_mass)"       # Calculate the gamma factor of the parent particle
 emrat             = "Numba::calc_energy_in_beam(pgamma, costh)"           # Weighted neutrino energy in the lab frame. Small angle approximation.
 nu_energy         = "dk2nu.decay.necm * emrat"                            # Lorentz boost the neutrino energy into the lab frame
-weight            = "calc_weight(dk2nu.decay, sangdet, emrat, parent_energy, nu_energy, pgamma, rr)"
-# theta_p = "Numba::theta_p(v_parent_momentum, det_loc)"
+flux_wgt          = "calc_weight(dk2nu.decay, sangdet, emrat, parent_energy, nu_energy, pgamma, rr)"
+flux_wgt_POT      = "pot_wgt*flux_wgt"
+theta_p           = "Numba::theta_p(v_parent_momentum, det_loc)"
 # par_codes = "Numba::parent_to_code(dk2nu.ancestor.pdg)"
 # target_codes = "Numba::target_to_code(dk2nu.ancestor.nucleus)"
+# ancestor_vol      = "get_volumes(dk2nu.ancestor)"
 # ancestor_parent_pdg = "Numba::ancestor_parent_pdg(dk2nu.ancestor.pdg)"
 # ancestor_parent_mom = "Numba::calc_magnitudes(dk2nu.ancestor.pprodpx, dk2nu.ancestor.pprodpy, dk2nu.ancestor.pprodpz)"
 # ancestor_parent_mom = "get_incident_momenta(dk2nu.ancestor)"
@@ -60,3 +68,48 @@ weight            = "calc_weight(dk2nu.decay, sangdet, emrat, parent_energy, nu_
 # ancestor_pT = "calc_pT(dk2nu.ancestor)"
 # ancestor_xF = "calc_xF(dk2nu.ancestor, ancestor_mass)"
 
+[histograms]
+# Define histograms to create
+# see ROOT::RDataFrame::Histo1D or ::Histo2D
+
+## 1-D histograms require a title, binning, variable. Weight is optional.
+## 2-D histograms require a title, binning for x and y, variables. Weight is optional.
+## For unweighted hists, set weight to "".
+
+# Flux vs. Neutrino Energy Spectra
+[histograms.h_Enu_numu]
+dir = "flux_Enu"  # Directory to save the histogram in the output file
+title = "#nu_{#mu};E_{#nu} [GeV];d#Phi/dE_{#nu} [m^{-2} POT^{-1}]"  # Title of the histogram;x-axis label;y-axis label
+bins = [200, 0, 20] # Binning of the histogram [nbins, low, high]
+# bins = [[0, 20, 0.1]]  # Equivalent to above; [low, high, width]
+# bins = [[0, 3.0, 0.1], [3.0, 6.0, 0.2]]  # Variable bin widths [[low, high, width], ...]
+var = "nu_energy"  # Variable to histogram. From [definitions] or [aliases]
+weight = "flux_wgt_POT" # Weight to apply to the histogram. From [definitions] or [aliases]
+filter = "is_numu"      # Filter/cut to apply to the entries. From [definitions]
+# filter = "nu_pdg == 14"  # Equivalent to above; you can define the filters/cuts in-place, but if using the same filter for multiple hists, it seems like you'll get better performance by adding it to the [definitions].
+
+# You can copy the configuration from another histogram and override specific fields.
+[histograms.h_Enu_numu_pipm]
+copy_from = "h_Enu_numu"
+title = "#pi^{+} #rightarrow #nu_{#mu};E_{#nu} [GeV];d#Phi/dE_{#nu} [m^{-2} POT^{-1}]"
+filter = "is_numu & is_pipm"
+
+# Parent decay momentum angle w.r.t. NuMI beam direction
+[histograms.h_thetapar_numu_pipm]
+dir = "parent_angle"
+title = "#pi^{+} #rightarrow #nu_{#mu};#theta_{p} [mrad];d#Phi/d#theta_{p} [m^{-2} mrad^{-1} POT^{-1}]"
+bins = [100, -500, 500]
+var = "theta_p"
+weight = "flux_wgt_POT"
+filter = "is_numu & is_pipm"
+
+# 2D parent angle vs. neutrino energy
+[histograms.h_thetapar_Enu_numu_Kpm]
+dir = "parent_angle"
+title = "h_thetapar_Enu_numu_Kpm;#theta_{parent} [mrad];E_{#nu} [GeV]"
+xbins = [1000, -500.0, 500.0]
+ybins = [100, 0, 10]
+xvar = "theta_p"
+yvar = "nu_energy"
+weight = "flux_wgt_POT"
+filter = "is_numu & is_Kpm"
