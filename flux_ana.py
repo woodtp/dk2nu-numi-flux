@@ -206,7 +206,7 @@ def run_analysis(
 
         sample_dir.WriteObject(hpot, hpot.GetName())
 
-        logging.info("If the event loop hasn't already been triggered. It will be be now, for sure. :)")
+        logging.info("If the event loop hasn't already been triggered. It will be now, for sure. :)")
         for h in hists:
             logging.info(f"Writing histogram {h.GetName()} to {out_fname}...")
             sample_dir.cd()
