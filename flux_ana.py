@@ -116,7 +116,6 @@ def run_analysis(
         else:
             hist_name = f"{sample_name}/{key}"
 
-        print("========= ", hist_name, h, " ==========", sep="\n")
         # checking whether it's a 1D or 2D histogram
         if "yvar" not in h:
             if _is_regular_bins(h["bins"]):
