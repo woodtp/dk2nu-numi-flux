@@ -3,7 +3,7 @@ import sys
 from pathlib import Path
 
 import numpy as np
-import ROOT
+import ROOT  # type: ignore
 
 logging.info("jit'ing functions...")
 
@@ -22,6 +22,7 @@ def set_ROOT_opts(mt: bool = False) -> None:
     ROOT.gSystem.Load(str(libdk2nuTree))  # type: ignore
     ROOT.gSystem.Load("./libWeight.so")  # type: ignore
     ROOT.gInterpreter.Declare('#include "Weight.h"')  # type: ignore
+    ROOT.TH1.AddDirectory(False)  # type: ignore
 
 
 @ROOT.Numba.Declare(["int"], "double")  # type: ignore
