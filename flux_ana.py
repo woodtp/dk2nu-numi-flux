@@ -6,9 +6,10 @@ import logging
 import sys
 import time
 from pathlib import Path
-from typing import Any
+from typing import Any, Callable
 
 import ROOT  # type: ignore
+import uproot
 
 if sys.version_info >= (3, 11):
     import tomllib
@@ -38,7 +39,7 @@ def run_analysis(
 ) -> None:
     df = ROOT.RDataFrame("dk2nuTree", in_fname)  # type: ignore
     if debug:
-        df = df.Range(0, 10000)
+        df = df.Range(0, 250_000)
 
     root_version = ROOT.__version__  # type: ignore
     minor = root_version.split(".")[1]  # major, minor, patch
@@ -62,19 +63,19 @@ def run_analysis(
     logging.debug(f"Location: {det_loc}")
 
     pot = get_pot(in_fname, cfg["pot_per_file"])
+    # pot_wgt = 1.0 / pot
 
-    df = df.Define("pot_wgt", f"1.0 / {pot}")
-    logging.info(f"POT = {pot:_}. Weight available as 'pot_wgt' = 1/POT = {1/pot:e}")
+    # logging.info(f"POT = {pot:_}. Weight available as 'pot_wgt' = 1/POT = {pot_wgt:e}")
 
     df = df.Define("det_loc", f"ROOT::RVec<double>{{ {det_loc[0]}, {det_loc[1]}, {det_loc[2]} }}")
 
-    for key, val in cfg["aliases"].items():
-        logging.debug(f"Applying Alias: {val} -> {key}")
-        df = df.Alias(key, val)
+    for other_key, val in cfg["aliases"].items():
+        logging.debug(f"Applying Alias: {val} -> {other_key}")
+        df = df.Alias(other_key, val)
 
-    for key, val in cfg["definitions"].items():
-        logging.debug(f"Applying definition: {key}")
-        df = df.Define(key, val)
+    for other_key, val in cfg["definitions"].items():
+        logging.debug(f"Applying definition: {other_key}")
+        df = df.Define(other_key, val)
 
     for val in cfg["filters"].values():
         logging.debug(f"Applying filter: {val}")
@@ -92,51 +93,54 @@ def run_analysis(
         return all(isinstance(x, list) and len(x) == 3 for x in bins)
 
     hists = []
-    for i, (name, h) in enumerate(cfg["histograms"].items()):
-        if (key := h.get("copy_from")) is not None:
-            logging.debug(f"Copying histogram params from {key} to {name}")
-            h = cfg["histograms"][key]
+    df_cache = {}
+    for key, h in cfg["histograms"].items():
+        if (other_key := h.get("copy_from")) is not None:
+            logging.debug(f"Copying histogram params from {other_key} to {key}")
+            h = cfg["histograms"][other_key].copy()
             # apply any overrides
-            h.update(cfg["histograms"][name])
+            h.update(cfg["histograms"][key])
 
         weight = h.get("weight", "")
 
-        if h.get("filter") is not None:
-            if weight == "":
-                wgt_def = f"{h['filter']}"
+        df_ref = df
+        if (filt_def := h.get("filter")) is not None:
+            if filt_def in df_cache:
+                df_ref = df_cache[filt_def]
             else:
-                wgt_def = f"({h['weight']})*({h['filter']})"
-            weight = f"weight_{i}"
-            df = df.Define(weight, wgt_def)
+                df_ref = df.Filter(filt_def)
+                df_cache[filt_def] = df_ref
 
         if (dir := h.get("dir")) is not None:
-            name = f"{dir}/{name}"
+            hist_name = f"{sample_name}/{dir}/{key}"
+        else:
+            hist_name = f"{sample_name}/{key}"
 
         # checking whether it's a 1D or 2D histogram
         if "yvar" not in h:
             if _is_regular_bins(h["bins"]):
                 nbins, low, high = h["bins"]
 
-                logging.debug(f"Creating 1D histogram {name} with {nbins} bins from {low} to {high}")
+                logging.debug(f"Creating 1D histogram {key} with {nbins} bins from {low} to {high}")
 
-                hists.append(df.Histo1D((name, h["title"], nbins, low, high), h["var"], weight))
+                hists.append(df_ref.Histo1D((hist_name, h["title"], nbins, low, high), h["var"], weight))
             elif _is_variable_bins(h["bins"]):
                 bins = np.array([])
                 for bs in h["bins"]:
                     low, high, step = bs
                     bins = np.append(bins, np.arange(low, high+step, step))
 
-                logging.debug(f"Creating 1D histogram {name} with variable bins:\n{bins}")
+                logging.debug(f"Creating 1D histogram {key} with variable bins:\n{bins}")
 
-                hists.append(df.Histo1D((name, h["title"], len(bins) - 1, bins), h["var"], weight))
+                hists.append(df_ref.Histo1D((hist_name, h["title"], len(bins) - 1, bins), h["var"], weight))
             else:
-                raise ValueError(f"Invalid binning format for histogram {name}. Exiting...")
+                raise ValueError(f"Invalid binning format for histogram {key}. Exiting...")
         else:
             if _is_regular_bins(h["xbins"]) and _is_regular_bins(h["ybins"]):
                 nbinsx, xlow, xhigh = h["xbins"]
                 nbinsy, ylow, yhigh = h["ybins"]
 
-                hists.append(df.Histo2D((name, h["title"], nbinsx, xlow, xhigh, nbinsy, ylow, yhigh), h["xvar"], h["yvar"], weight))
+                hists.append(df_ref.Histo2D((hist_name, h["title"], nbinsx, xlow, xhigh, nbinsy, ylow, yhigh), h["xvar"], h["yvar"], weight))
             elif _is_variable_bins(h["xbins"]) and _is_regular_bins(h["ybins"]):
                 xbins = np.array([])
 
@@ -146,9 +150,9 @@ def run_analysis(
 
                 nbinsy, ylow, yhigh = h["ybins"]
 
-                logging.debug(f"Creating 2D histogram {name} with variable x bins:\n{xbins} and {nbinsy} regular y bins from {ylow} to {yhigh}")
+                logging.debug(f"Creating 2D histogram {key} with variable x bins:\n{xbins} and {nbinsy} regular y bins from {ylow} to {yhigh}")
 
-                hists.append(df.Histo2D((name, h["title"], len(xbins)-1, xbins, nbinsy, ylow, yhigh), h["xvar"], h["yvar"], weight))
+                hists.append(df_ref.Histo2D((hist_name, h["title"], len(xbins)-1, xbins, nbinsy, ylow, yhigh), h["xvar"], h["yvar"], weight))
             elif _is_regular_bins(h["xbins"]) and _is_variable_bins(h["ybins"]):
                 nbinsx, xlow, xhigh = h["xbins"]
 
@@ -158,9 +162,9 @@ def run_analysis(
                     low, high, step = bs
                     ybins = np.append(ybins, np.arange(low, high+step, step))
 
-                logging.debug(f"Creating 2D histogram {name} with variable y bins:\n{ybins} and {nbinsx} regular x bins from {xlow} to {xhigh}")
+                logging.debug(f"Creating 2D histogram {key} with variable y bins:\n{ybins} and {nbinsx} regular x bins from {xlow} to {xhigh}")
 
-                hists.append(df.Histo2D((name, h["title"], nbinsx, xlow, xhigh, len(ybins)-1, ybins), h["xvar"], h["yvar"], weight))
+                hists.append(df_ref.Histo2D((hist_name, h["title"], nbinsx, xlow, xhigh, len(ybins)-1, ybins), h["xvar"], h["yvar"], weight))
             elif _is_variable_bins(h["xbins"]) and _is_variable_bins(h["ybins"]):
                 xbins = np.array([])
                 for bs in h["xbins"]:
@@ -172,10 +176,10 @@ def run_analysis(
                     low, high, step = bs
                     ybins = np.append(ybins, np.arange(low, high+step, step))
 
-                logging.debug(f"Creating 2D histogram {name} with variable x and y bins:\n{xbins}\n and\n{ybins}")
-                hists.append(df.Histo2D((name, h["title"], len(xbins)-1, xbins, len(ybins)-1, ybins), h["xvar"], h["yvar"], weight))
+                logging.debug(f"Creating 2D histogram {key} with variable x and y bins:\n{xbins}\n and\n{ybins}")
+                hists.append(df_ref.Histo2D((hist_name, h["title"], len(xbins)-1, xbins, len(ybins)-1, ybins), h["xvar"], h["yvar"], weight))
             else:
-                raise ValueError(f"Invalid binning format for histogram {name}. Exiting...")
+                raise ValueError(f"Invalid binning format for histogram {key}. Exiting...")
 
     opts = ROOT.RDF.RSnapshotOptions()  # type: ignore
     opts.fMode = "UPDATE"
@@ -195,31 +199,22 @@ def run_analysis(
     else:
         logging.info("Not saving any branches.")
 
-    with ROOT.TFile.Open(out_fname, "UPDATE") as f:  # type: ignore
-        sample_dir = f.mkdir(sample_name)
-        sample_dir.cd()
+    open_fn: Callable[[str], uproot.WritableDirectory] = uproot.update if Path(out_fname).exists() else uproot.recreate
+
+    with open_fn(out_fname) as f:
+        for h in hists:
+            hname = h.GetName()
+            h_obj = h.GetValue()
+            logging.info(f"Writing histogram {hname} to {out_fname}...")
+            logging.debug(f"{h}, {h_obj}")
+            f[hname] = h_obj
+
+        logging.info(f"Writing POT to {out_fname}:{sample_name}/hpot")
 
         hpot = ROOT.TH1D("hpot", "POT", 1, 0, 1)  # type: ignore
         hpot.SetBinContent(1, pot)
 
-        logging.info(f"Writing POT to {out_fname}:{sample_dir}/{hpot.GetName()}")
-
-        sample_dir.WriteObject(hpot, hpot.GetName())
-
-        logging.info("If the event loop hasn't already been triggered. It will be now, for sure. :)")
-        for h in hists:
-            logging.info(f"Writing histogram {h.GetName()} to {out_fname}...")
-            sample_dir.cd()
-            d = ROOT.gDirectory  # type: ignore
-            name = h.GetName()
-            if "/" in name:
-                dir, name = h.GetName().rsplit("/", 1)
-                if not sample_dir.GetDirectory(dir):
-                    d = sample_dir.mkdir(dir)
-                else:
-                    d = sample_dir.GetDirectory(dir)
-                d.cd()
-            d.WriteObject(h.GetPtr(), name)
+        f[f"{sample_name}/hpot"] = hpot
 
 
 def main() -> None:
