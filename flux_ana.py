@@ -69,13 +69,13 @@ def run_analysis(
 
     df = df.Define("det_loc", f"ROOT::RVec<double>{{ {det_loc[0]}, {det_loc[1]}, {det_loc[2]} }}")
 
-    for other_key, val in cfg["aliases"].items():
-        logging.debug(f"Applying Alias: {val} -> {other_key}")
-        df = df.Alias(other_key, val)
+    for key, val in cfg["aliases"].items():
+        logging.debug(f"Applying Alias: {val} -> {key}")
+        df = df.Alias(key, val)
 
-    for other_key, val in cfg["definitions"].items():
-        logging.debug(f"Applying definition: {other_key}")
-        df = df.Define(other_key, val)
+    for key, val in cfg["definitions"].items():
+        logging.debug(f"Applying definition: {key}")
+        df = df.Define(key, val)
 
     for val in cfg["filters"].values():
         logging.debug(f"Applying filter: {val}")
