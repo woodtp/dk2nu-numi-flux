@@ -83,7 +83,7 @@ bins = [200, 0, 20] # Binning of the histogram [nbins, low, high]
 # bins = [[0, 20, 0.1]]  # Equivalent to above; [low, high, width]
 # bins = [[0, 3.0, 0.1], [3.0, 6.0, 0.2]]  # Variable bin widths [[low, high, width], ...]
 var = "nu_energy"  # Variable to histogram. From [definitions] or [aliases]
-weight = "flux_wgt_POT" # Weight to apply to the histogram. From [definitions] or [aliases]
+weight = "flux_wgt" # Weight to apply to the histogram. From [definitions] or [aliases]
 filter = "is_numu"      # Filter/cut to apply to the entries. From [definitions]
 # filter = "nu_pdg == 14"  # Equivalent to above; you can define the filters/cuts in-place, but if using the same filter for multiple hists, it seems like you'll get better performance by adding it to the [definitions].
 
@@ -91,7 +91,7 @@ filter = "is_numu"      # Filter/cut to apply to the entries. From [definitions]
 [histograms.h_Enu_numu_pipm]
 copy_from = "h_Enu_numu"
 title = "#pi^{+} #rightarrow #nu_{#mu};E_{#nu} [GeV];d#Phi/dE_{#nu} [m^{-2} POT^{-1}]"
-filter = "is_numu & is_pipm"
+filter = "is_numu && is_pipm"
 
 # Parent decay momentum angle w.r.t. NuMI beam direction
 [histograms.h_thetapar_numu_pipm]
@@ -99,8 +99,8 @@ dir = "parent_angle"
 title = "#pi^{+} #rightarrow #nu_{#mu};#theta_{p} [mrad];d#Phi/d#theta_{p} [m^{-2} mrad^{-1} POT^{-1}]"
 bins = [100, -500, 500]
 var = "theta_p"
-weight = "flux_wgt_POT"
-filter = "is_numu & is_pipm"
+weight = "flux_wgt"
+filter = "is_numu && is_pipm"
 
 # 2D parent angle vs. neutrino energy
 [histograms.h_thetapar_Enu_numu_Kpm]
@@ -110,5 +110,5 @@ xbins = [1000, -500.0, 500.0]
 ybins = [100, 0, 10]
 xvar = "theta_p"
 yvar = "nu_energy"
-weight = "flux_wgt_POT"
-filter = "is_numu & is_Kpm"
+weight = "flux_wgt"
+filter = "is_numu && is_Kpm"
