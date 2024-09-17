@@ -54,7 +54,6 @@ pgamma            = "Numba::calc_gamma(parent_energy, parent_mass)"       # Calc
 emrat             = "Numba::calc_energy_in_beam(pgamma, costh)"           # Weighted neutrino energy in the lab frame. Small angle approximation.
 nu_energy         = "dk2nu.decay.necm * emrat"                            # Lorentz boost the neutrino energy into the lab frame
 flux_wgt          = "calc_weight(dk2nu.decay, sangdet, emrat, parent_energy, nu_energy, pgamma, rr)"
-flux_wgt_POT      = "pot_wgt*flux_wgt"
 theta_p           = "Numba::theta_p(v_parent_momentum, det_loc)"
 # par_codes = "Numba::parent_to_code(dk2nu.ancestor.pdg)"
 # target_codes = "Numba::target_to_code(dk2nu.ancestor.nucleus)"
