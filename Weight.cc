@@ -389,3 +389,68 @@ double calc_weight(const bsim::Decay& decay,
   }
   return wght*wt_ratio;
 }
+
+// ancestor ivol
+std::vector<std::string> interaction_volumes(const ROOT::RVec<bsim::Ancestor>& ancestors)
+{
+  std::vector<std::string> vols;
+  vols.reserve(ancestors.size() - 2);
+  for (std::size_t i = 1; i < ancestors.size() - 1; ++i) {
+      vols.push_back(ancestors[i].ivol);
+  }
+  return vols;
+}
+
+// carbon vol
+
+ROOT::RVec<bool> is_carbon_volume(const ROOT::RVec<bsim::Ancestor>& ancestors)
+{
+  static const std::unordered_set<std::string> carbon_vols = {
+      "TGT1", "BudalMonitor", "Budal_HFVS", "Budal_VFHS"
+  };
+
+  ROOT::RVec<bool> result;
+  result.reserve(ancestors.size() - 1); 
+
+  for (std::size_t i = 0; i < ancestors.size() - 1; ++i) {
+      result.push_back(carbon_vols.count(ancestors[i].ivol) > 0);
+  }
+
+  return result;
+}
+
+
+// helper function to convert from std::vector<double> to ROOT::RVec<double>
+ROOT::RVec<double> to_rvec(const std::vector<double>& vec)
+{
+  return ROOT::RVec<double>(vec.begin(), vec.end());
+}
+
+// calc_xF RVec
+ROOT::RVec<double> calc_xF_rvec(const ROOT::RVec<bsim::Ancestor>& ancestors,
+                                const ROOT::RVec<double>& ancestor_masses) {
+  return to_rvec(calc_xF(ancestors, ancestor_masses));
+}
+
+// calc_pT RVec
+ROOT::RVec<double> calc_pT_rvec(const ROOT::RVec<bsim::Ancestor>& ancestors) {
+  return to_rvec(calc_pT(ancestors));
+}
+
+// calc_theta RVec
+ROOT::RVec<double> calc_theta_rvec(const ROOT::RVec<bsim::Ancestor>& ancestors) {
+  return to_rvec(calc_theta(ancestors));
+}
+
+// get_incident_momenta RVec
+ROOT::RVec<double> get_incident_momenta_rvec(const ROOT::RVec<bsim::Ancestor>& ancestors) {
+  return to_rvec(get_incident_momenta(ancestors));
+}
+
+//get_produced_momenta RVec
+ROOT::RVec<double> get_produced_momenta_rvec(const ROOT::RVec<bsim::Ancestor>& ancestors) {
+  return to_rvec(get_produced_momenta(ancestors));
+}
+
+
+

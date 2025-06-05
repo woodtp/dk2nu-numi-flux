@@ -319,3 +319,11 @@ def ancestor_incident_momenta(momenta: np.ndarray) -> np.ndarray:
 #         return -1.0
 #
 #     return np.array([_pdg_to_mass(p) for p in pdg_ids], dtype=np.float64)
+
+@ROOT.Numba.Declare(["RVec<int>"], "RVec<int>")  # type: ignore
+def incident_pdg_codes(ancestor_pdg: np.ndarray) -> np.ndarray:
+    return ancestor_pdg[:-1]
+
+@ROOT.Numba.Declare(["RVec<int>"], "RVec<int>")  # type: ignore
+def produced_pdg_codes(ancestor_pdg: np.ndarray) -> np.ndarray:
+    return ancestor_pdg[1:]
