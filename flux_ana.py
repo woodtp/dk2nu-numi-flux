@@ -21,11 +21,7 @@ import numpy as np
 
 logging.basicConfig(level=logging.INFO, format="[%(levelname)s] %(message)s")
 
-def get_pot(files: str, pot_per_file: int) -> int:
-    # path, pattern = files.rsplit("/", 1)
-    # nfiles = len(list(Path(path).glob(pattern)))
-    # return pot_per_file * nfiles
-    # This is the more 'proper' way to calculate POT, but it's slow
+def get_pot(files: str) -> int:
     df = ROOT.RDataFrame("dkmetaTree", files)
     return df.Sum("pots").GetValue()
 
@@ -53,7 +49,7 @@ def run_analysis(
 
     logging.debug(f"Loaded {in_fname}. Applying definitions...")
 
-    pot = get_pot(in_fname, cfg["pot_per_file"])
+    pot = get_pot(in_fname)
     pot_wgt = 1.0 / pot
 
     logging.info(f"POT = {pot:_}. Weight available as 'pot_wgt' = 1/POT = {pot_wgt:e}")
