@@ -32,188 +32,6 @@ enum PDG {
   ETAPRIME = 331
 };
 
-static double clip(const double val)
-{
-  // clip value to [-1, 1]
-  return std::max(-1.0, std::min(1.0, val));
-}
-
-static bool skip_particle(const bsim::Ancestor& ancestor)
-{
-  // if the beam proton or decay process, skip
-  // this should cover differences between Geant4-9 (Primary) and Geant4-10 (BeamParticle)
-  return ancestor.proc == "Primary" || ancestor.proc == "BeamParticle" || ancestor.proc == "Decay";
-}
-
-std::vector<std::string> get_volumes(const ROOT::RVec<bsim::Ancestor>& ancestors)
-{
-  std::vector<std::string> vol;
-  vol.reserve(ancestors.size() - 1);
-  for (std::size_t i = 0; i < ancestors.size() - 1; ++i) {
-    vol.push_back(ancestors[i].ivol);
-  }
-  return vol;
-}
-
-std::vector<bool> is_carbon_vol(const ROOT::RVec<bsim::Ancestor>& ancestors)
-{
-  std::vector<bool> vol;
-  vol.reserve(ancestors.size() - 2);
-  for (std::size_t i = 1; i < ancestors.size() - 1; ++i) {
-    vol.emplace_back(ancestors[i].ivol == "TGT1" || ancestors[i].ivol == "Budal_Monitor" || ancestors[i].ivol == "Budal_HFVS" || ancestors[i].ivol == "Budal_VFHS");
-  }
-  return vol;
-}
-
-std::vector<double> get_incident_momenta(const ROOT::RVec<bsim::Ancestor>& ancestors)
-{
-  std::vector<double> p_inc(ancestors.size() - 1, DEFAULT_DOUBLE);
-  const bool is_old_g4 = ancestors[0].proc == "Primary";
-  for (std::size_t i = 0; i < ancestors.size() - 1; ++i) {
-    if(skip_particle(ancestors[i])) continue;
-    const bsim::Ancestor& part = i == 0 || !is_old_g4 ? ancestors[i] : ancestors[i - 1];
-    p_inc[i] = std::sqrt(part.pprodpx*part.pprodpx +
-                         part.pprodpy*part.pprodpy +
-                         part.pprodpz*part.pprodpz);
-  }
-  return p_inc;
-}
-
-std::vector<double> get_produced_momenta(const ROOT::RVec<bsim::Ancestor>& ancestors)
-{
-  std::vector<double> p_prod(ancestors.size() - 1, DEFAULT_DOUBLE);
-  for (std::size_t i = 0; i < ancestors.size() - 1; ++i) {
-    if(skip_particle(ancestors[i])) continue;
-    p_prod[i] = std::sqrt(ancestors[i].startpx*ancestors[i].startpx
-                          + ancestors[i].startpy*ancestors[i].startpy
-                          + ancestors[i].startpz*ancestors[i].startpz);
-  }
-  return p_prod;
-}
-
-std::vector<double> calc_theta(const ROOT::RVec<bsim::Ancestor>& ancestors)
-{
-  std::vector<double> thetas(ancestors.size() - 1, DEFAULT_DOUBLE);
-
-  const bool is_old_g4 = ancestors[0].proc == "Primary";
-
-  for (std::size_t i = 0; i < ancestors.size() - 1; ++i) {
-    if (skip_particle(ancestors[i])) continue;
-
-    auto const& prod = ancestors[i];
-
-    const double pincpx = is_old_g4 ? ancestors[i - 1].pprodpx : prod.pprodpx;
-    const double pincpy = is_old_g4 ? ancestors[i - 1].pprodpy : prod.pprodpy;
-    const double pincpz = is_old_g4 ? ancestors[i - 1].pprodpz : prod.pprodpz;
-    const double p_inc = std::sqrt(pincpx*pincpx + pincpy*pincpy + pincpz*pincpz); // [GeV/c]
-
-    const double p_prod = std::sqrt(prod.startpx*prod.startpx +
-                                    prod.startpy*prod.startpy +
-                                    prod.startpz*prod.startpz); // [GeV/c]
-
-
-    if (p_prod == 0. || p_inc == 0.) continue;
-
-    const double costh = clip((prod.startpx*pincpx + prod.startpy*pincpy + prod.startpz*pincpz) / (p_prod*p_inc));
-
-    thetas[i] = std::acos(costh);
-  }
-
-  return thetas;
-}
-
-std::vector<double> calc_pT(const ROOT::RVec<bsim::Ancestor>& ancestors)
-{
-  std::vector<double> pT(ancestors.size() - 1, DEFAULT_DOUBLE);
-
-  const bool is_old_g4 = ancestors[0].proc == "Primary";
-
-  for (std::size_t i = 0; i < ancestors.size() - 1; ++i) {
-    if (skip_particle(ancestors[i])) continue;
-
-    auto const& prod = ancestors[i];
-
-    const double pincpx = is_old_g4 ? ancestors[i - 1].pprodpx : prod.pprodpx;
-    const double pincpy = is_old_g4 ? ancestors[i - 1].pprodpy : prod.pprodpy;
-    const double pincpz = is_old_g4 ? ancestors[i - 1].pprodpz : prod.pprodpz;
-    const double p_inc = std::sqrt(pincpx*pincpx + pincpy*pincpy + pincpz*pincpz); // [GeV/c]
-
-    const double p_prod = std::sqrt(prod.startpx*prod.startpx +
-                                    prod.startpy*prod.startpy +
-                                    prod.startpz*prod.startpz);
-
-
-    if (p_prod == 0. || p_inc == 0.) continue;
-
-    const double costh = clip((prod.startpx*pincpx + prod.startpy*pincpy + prod.startpz*pincpz) / (p_prod*p_inc));
-
-    const double sinth = std::sqrt(1. - costh*costh);
-
-    pT[i] = p_prod*sinth;
-  }
-
-  return pT;
-}
-
-std::vector<double> calc_xF(const ROOT::RVec<bsim::Ancestor>& ancestors,
-                            const ROOT::RVec<double>& ancestor_masses)
-{
-  std::vector<double> xF(ancestors.size() - 1, DEFAULT_DOUBLE);
-
-  // Assume the nuclear target mass to be an average between proton and neutron
-  constexpr double nucleon_mass = 0.93891875433; // [GeV]
-  constexpr double nucleon_mass2 = nucleon_mass*nucleon_mass;
-
-  const bool is_old_g4 = ancestors[0].proc == "Primary";
-
-  for (std::size_t i = 0; i < ancestors.size() - 1; ++i) {
-    if (skip_particle(ancestors[i])) continue;
-
-    auto const& prod = ancestors[i];
-
-    const double mass_inc = ancestor_masses[i - 1];
-    const double mass_inc2 = mass_inc*mass_inc;
-    const double mass_prod = ancestor_masses[i];
-
-    const double pincpx = is_old_g4 ? ancestors[i - 1].pprodpx : prod.pprodpx;
-    const double pincpy = is_old_g4 ? ancestors[i - 1].pprodpy : prod.pprodpy;
-    const double pincpz = is_old_g4 ? ancestors[i - 1].pprodpz : prod.pprodpz;
-    const double p_inc = std::sqrt(pincpx*pincpx + pincpy*pincpy + pincpz*pincpz); // [GeV/c]
-
-    auto const p_prod = std::sqrt(prod.startpx*prod.startpx +
-                                  prod.startpy*prod.startpy +
-                                  prod.startpz*prod.startpz); // [GeV/c]
-
-    if (p_prod == 0. || p_inc == 0.) continue;
-
-    const double costh = clip((prod.startpx*pincpx +
-                               prod.startpy*pincpy +
-                               prod.startpz*pincpz) / (p_prod*p_inc));
-
-    // Calculate the produced particle's longitudinal momentum in the lab frame
-    const double pz = p_prod*costh;
-
-    // Calculate the incident particle's energy in the lab frame
-    const double E_lab_inc = std::sqrt(p_inc*p_inc + mass_inc2);
-
-    // The center of mass energy of the incident particle and the target nucleon
-    const double Ecm = std::sqrt(mass_inc2 + nucleon_mass2 + 2.0*nucleon_mass*E_lab_inc);
-    const double betacm = std::sqrt(E_lab_inc*E_lab_inc - mass_inc2) / (E_lab_inc + nucleon_mass);
-    const double gammacm = 1.0 / std::sqrt(1.0 - betacm*betacm); // Lorentz factor
-
-    const double E_lab_prod = std::sqrt(p_prod*p_prod + mass_prod*mass_prod);
-
-    // Boost the produced particle's longitudinal momentum to the center of mass frame
-    const double pL = gammacm*(pz - betacm*E_lab_prod);
-
-    // Calculate the Feynman-X (ratio of the produced particle's longitudinal
-    // momentum to half of the center of mass energy; the theoretical maximum.)
-    xF[i] = 2.0*pL / Ecm;
-  }
-
-  return xF;
-}
-
 static double pdgid_to_mass(int pdgid) {
   switch(std::abs(pdgid)) {
     case PDG::MUON:
@@ -249,6 +67,198 @@ static double pdgid_to_mass(int pdgid) {
     default:
       return -1.0;
   }
+}
+
+static double clip(const double val)
+{
+  // clip value to [-1, 1]
+  return std::max(-1.0, std::min(1.0, val));
+}
+
+static bool skip_particle(const bsim::Ancestor& ancestor)
+{
+  // if the beam proton or decay process, skip
+  // this should cover differences between Geant4-9 (Primary) and Geant4-10 (BeamParticle)
+  return ancestor.proc == "Primary" || ancestor.proc == "BeamParticle" || ancestor.proc == "Decay";
+}
+
+std::vector<std::string> get_volumes(const ROOT::RVec<bsim::Ancestor>& ancestors)
+{
+  std::vector<std::string> vol;
+  vol.reserve(ancestors.size() - 1);
+  for (std::size_t i = 0; i < ancestors.size() - 1; ++i) {
+    vol.push_back(ancestors[i].ivol);
+  }
+  return vol;
+}
+
+std::vector<bool> is_carbon_vol(const ROOT::RVec<bsim::Ancestor>& ancestors)
+{
+  std::vector<bool> vol;
+  vol.reserve(ancestors.size() - 2);
+  for (std::size_t i = 1; i < ancestors.size() - 1; ++i) {
+    vol.emplace_back(ancestors[i].ivol == "TGT1" || ancestors[i].ivol == "Budal_Monitor" || ancestors[i].ivol == "Budal_HFVS" || ancestors[i].ivol == "Budal_VFHS");
+  }
+  return vol;
+}
+
+std::vector<double> get_incident_momenta(const ROOT::RVec<bsim::Ancestor>& ancestors)
+{
+  std::vector<double> p_inc(ancestors.size() - 2, DEFAULT_DOUBLE);
+  const bool is_old_g4 = ancestors[0].proc == "Primary";
+  // std::size_t j = 0;
+  for (std::size_t i = 1; i < ancestors.size() - 1; ++i) {
+    // if(skip_particle(ancestors[i])) continue;
+    const bsim::Ancestor& part = i == 0 || !is_old_g4 ? ancestors[i] : ancestors[i - 1];
+    p_inc[i-1] = std::sqrt(part.pprodpx*part.pprodpx +
+                         part.pprodpy*part.pprodpy +
+                         part.pprodpz*part.pprodpz);
+  }
+  return p_inc;
+}
+
+std::vector<double> get_produced_momenta(const ROOT::RVec<bsim::Ancestor>& ancestors)
+{
+  std::vector<double> p_prod(ancestors.size() - 2, DEFAULT_DOUBLE);
+  for (std::size_t i = 1; i < ancestors.size() - 1; ++i) {
+    // if(skip_particle(ancestors[i])) continue;
+    p_prod[i-1] = std::sqrt(ancestors[i].startpx*ancestors[i].startpx
+                          + ancestors[i].startpy*ancestors[i].startpy
+                          + ancestors[i].startpz*ancestors[i].startpz);
+  }
+  return p_prod;
+}
+
+std::vector<double> calc_theta(const ROOT::RVec<bsim::Ancestor>& ancestors)
+{
+  std::vector<double> thetas(ancestors.size() - 2, DEFAULT_DOUBLE);
+
+  const bool is_old_g4 = ancestors[0].proc == "Primary";
+
+  std::size_t j = 0;
+  for (std::size_t i = 1; i < ancestors.size() - 1; ++i) {
+    if (skip_particle(ancestors[i])) continue;
+
+    auto const& prod = ancestors[i];
+
+    const double pincpx = is_old_g4 ? ancestors[i - 1].pprodpx : prod.pprodpx;
+    const double pincpy = is_old_g4 ? ancestors[i - 1].pprodpy : prod.pprodpy;
+    const double pincpz = is_old_g4 ? ancestors[i - 1].pprodpz : prod.pprodpz;
+    const double p_inc = std::sqrt(pincpx*pincpx + pincpy*pincpy + pincpz*pincpz); // [GeV/c]
+
+    const double p_prod = std::sqrt(prod.startpx*prod.startpx +
+                                    prod.startpy*prod.startpy +
+                                    prod.startpz*prod.startpz); // [GeV/c]
+
+
+    if (p_prod == 0. || p_inc == 0.) continue;
+
+    const double costh = clip((prod.startpx*pincpx + prod.startpy*pincpy + prod.startpz*pincpz) / (p_prod*p_inc));
+
+    thetas[j++] = 1000.0*std::acos(costh); // convert to [mrad]
+  }
+
+  return thetas;
+}
+
+std::vector<double> calc_pT(const ROOT::RVec<bsim::Ancestor>& ancestors)
+{
+  std::vector<double> pT(ancestors.size() - 2, DEFAULT_DOUBLE);
+
+  const bool is_old_g4 = ancestors[0].proc == "Primary";
+
+  std::size_t j = 0;
+  for (std::size_t i = 1; i < ancestors.size() - 1; ++i) {
+    if (skip_particle(ancestors[i])) continue;
+
+    auto const& prod = ancestors[i];
+
+    const double pincpx = is_old_g4 ? ancestors[i - 1].pprodpx : prod.pprodpx;
+    const double pincpy = is_old_g4 ? ancestors[i - 1].pprodpy : prod.pprodpy;
+    const double pincpz = is_old_g4 ? ancestors[i - 1].pprodpz : prod.pprodpz;
+    const double p_inc = std::sqrt(pincpx*pincpx + pincpy*pincpy + pincpz*pincpz); // [GeV/c]
+
+    const double p_prod = std::sqrt(prod.startpx*prod.startpx +
+                                    prod.startpy*prod.startpy +
+                                    prod.startpz*prod.startpz);
+
+
+    if (p_prod == 0. || p_inc == 0.) continue;
+
+    const double costh = clip((prod.startpx*pincpx + prod.startpy*pincpy + prod.startpz*pincpz) / (p_prod*p_inc));
+
+    const double sinth = std::sqrt(1. - costh*costh);
+
+    pT[j++] = p_prod*sinth;
+  }
+
+  return pT;
+}
+
+std::vector<double> calc_xF(const ROOT::RVec<bsim::Ancestor>& ancestors)
+{
+  std::vector<double> xF(ancestors.size() - 2, DEFAULT_DOUBLE);
+
+  // Assume the nuclear target mass to be an average between proton and neutron
+  constexpr double nucleon_mass = 0.93891875433; // [GeV]
+  constexpr double nucleon_mass2 = nucleon_mass*nucleon_mass;
+
+  const bool is_old_g4 = ancestors[0].proc == "Primary";
+
+  // std::cout << "[DEBUG] ancestors.size() " << ancestors.size() << '\n'
+  //           << "ancestors[0].pdg = " << ancestors[0].pdg << '\n'
+  //           << "ancestors[-1].pdg = " << ancestors[ancestors.size()-1].pdg << '\n'
+  //           << "proc[0] " << ancestors[0].proc << '\n'
+  //           << "skip_particle([0]) " << skip_particle(ancestors[0]) << '\n'
+  //           << "is_old_g4 " << is_old_g4 << "\n\n";
+
+  std::size_t j = 0;
+  for (std::size_t i = 1; i < ancestors.size() - 1; ++i) {
+    if (skip_particle(ancestors[i])) continue;
+
+    auto const& prod = ancestors[i];
+
+    const double mass_inc = pdgid_to_mass(ancestors[i - 1].pdg);
+    const double mass_inc2 = mass_inc*mass_inc;
+    const double mass_prod = pdgid_to_mass(prod.pdg);
+
+    const double pincpx = is_old_g4 ? ancestors[i - 1].pprodpx : prod.pprodpx;
+    const double pincpy = is_old_g4 ? ancestors[i - 1].pprodpy : prod.pprodpy;
+    const double pincpz = is_old_g4 ? ancestors[i - 1].pprodpz : prod.pprodpz;
+    const double p_inc = std::sqrt(pincpx*pincpx + pincpy*pincpy + pincpz*pincpz); // [GeV/c]
+
+    auto const p_prod = std::sqrt(prod.startpx*prod.startpx +
+                                  prod.startpy*prod.startpy +
+                                  prod.startpz*prod.startpz); // [GeV/c]
+
+    if (p_prod == 0. || p_inc == 0.) continue;
+
+    const double costh = clip((prod.startpx*pincpx +
+                               prod.startpy*pincpy +
+                               prod.startpz*pincpz) / (p_prod*p_inc));
+
+    // Calculate the produced particle's longitudinal momentum in the lab frame
+    const double pz = p_prod*costh;
+
+    // Calculate the incident particle's energy in the lab frame
+    const double E_lab_inc = std::sqrt(p_inc*p_inc + mass_inc2);
+
+    // The center of mass energy of the incident particle and the target nucleon
+    const double Ecm = std::sqrt(mass_inc2 + nucleon_mass2 + 2.0*nucleon_mass*E_lab_inc);
+    const double betacm = std::sqrt(E_lab_inc*E_lab_inc - mass_inc2) / (E_lab_inc + nucleon_mass);
+    const double gammacm = 1.0 / std::sqrt(1.0 - betacm*betacm); // Lorentz factor
+
+    const double E_lab_prod = std::sqrt(p_prod*p_prod + mass_prod*mass_prod);
+
+    // Boost the produced particle's longitudinal momentum to the center of mass frame
+    const double pL = gammacm*(pz - betacm*E_lab_prod);
+
+    // Calculate the Feynman-X (ratio of the produced particle's longitudinal
+    // momentum to half of the center of mass energy; the theoretical maximum.)
+    xF[j++] = 2.0*pL / Ecm;
+  }
+
+  return xF;
 }
 
 static double parent_energy(const bsim::Decay& decay) {
@@ -410,9 +420,9 @@ ROOT::RVec<bool> is_carbon_volume(const ROOT::RVec<bsim::Ancestor>& ancestors)
   };
 
   ROOT::RVec<bool> result;
-  result.reserve(ancestors.size() - 1); 
+  result.reserve(ancestors.size() - 2);
 
-  for (std::size_t i = 0; i < ancestors.size() - 1; ++i) {
+  for (std::size_t i = 1; i < ancestors.size() - 1; ++i) {
       result.push_back(carbon_vols.count(ancestors[i].ivol) > 0);
   }
 
@@ -427,9 +437,8 @@ ROOT::RVec<double> to_rvec(const std::vector<double>& vec)
 }
 
 // calc_xF RVec
-ROOT::RVec<double> calc_xF_rvec(const ROOT::RVec<bsim::Ancestor>& ancestors,
-                                const ROOT::RVec<double>& ancestor_masses) {
-  return to_rvec(calc_xF(ancestors, ancestor_masses));
+ROOT::RVec<double> calc_xF_rvec(const ROOT::RVec<bsim::Ancestor>& ancestors) {
+  return to_rvec(calc_xF(ancestors));
 }
 
 // calc_pT RVec

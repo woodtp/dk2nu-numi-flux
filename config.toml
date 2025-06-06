@@ -5,7 +5,7 @@ location = [
     # [0, 0, 103648.837]  # 2x2/on-axis
 ]
 
-output_file = "/exp/icarus/app/users/faabdalr/fixed_fhc_rhc_run0_F.root"
+output_file = "fixed_fhc_rhc_run0_F.root"
 
 #output_file = "/exp/icarus/data/users/faabdalr/uniform_beam_fhc_test.root"
 #output_file = "/exp/icarus/data/users/faabdalr/gaussian_beam_fhc.root"
@@ -25,13 +25,13 @@ output_file = "/exp/icarus/app/users/faabdalr/fixed_fhc_rhc_run0_F.root"
 # save_branches = ["*"]
 save_branches = []
 
-# max_files = 1  # set this if you want to limit the number of files read
+max_files = 5  # set this if you want to limit the number of files read
 [file_sets]
 #run0_fhc = "/path/to/my/files/*.root" ## OVERRIDE THIS
 
 #run0_fhc = "/pnfs/icarus/persistent/users/faabdalr/numi_beamsim/fhc/run0/g4numi_minervame_me000z200i_138_1488543658_20250327174941_0000.root"
 run0_fhc = "/pnfs/icarus/persistent/users/faabdalr/numi_beamsim/fhc/run0/g4numi*.root"
-run0_rhc = "/pnfs/icarus/persisten/users/faabdalr/numi_beamsim/rhc/run0/g4numi*.root"
+# run0_rhc = "/pnfs/icarus/persisten/users/faabdalr/numi_beamsim/rhc/run0/g4numi*.root"
 
 #run0_rhc = "/pnfs/numix/flux/g4numi_syst_3rd_ana/test_g4numi_v6/me000z-200i/minervame/run0015/g4numi*.root"
 #run0_fhc = "/pnfs/numix/flux/g4numi_syst_3rd_ana/test_g4numi_v6/me000z200i/minervame/run0015/g4numi*.root"
@@ -149,9 +149,9 @@ ancestor_parent_mom = "get_incident_momenta_rvec(dk2nu.ancestor)"
 ancestor_incident_mom = "get_incident_momenta_rvec(dk2nu.ancestor)"
 ancestor_produced_mom = "get_produced_momenta_rvec(dk2nu.ancestor)"
 ancestor_produced_theta = "calc_theta_rvec(dk2nu.ancestor)"
-ancestor_mass = "Numba::ancestor_pdg2mass(dk2nu.ancestor.pdg)"
+# ancestor_mass = "Numba::ancestor_pdg2mass(dk2nu.ancestor.pdg)"
 ancestor_pT = "calc_pT_rvec(dk2nu.ancestor)"
-ancestor_xF = "calc_xF_rvec(dk2nu.ancestor, ancestor_mass)"
+ancestor_xF = "calc_xF_rvec(dk2nu.ancestor)"
 is_nucleon_incident = "(ancestor_incident_pdg == 2212) || (ancestor_incident_pdg == 2112)"
 is_nucleon_produced = "(ancestor_produced_pdg == 2212) || (ancestor_produced_pdg == 2112)"
 is_proton_incident = "ancestor_incident_pdg == 2212"
@@ -162,7 +162,7 @@ neg_xF = "(ancestor_xF < 0.0) && (ancestor_xF >= -0.25)"
 in_PS = "(ancestor_pT < 2.0) && (ancestor_incident_mom > 12.0)"
 in_CPS = "carbon_vol && (ancestor_pT < 2.0) && (ancestor_incident_mom > 12.0)"
 neg_xF_PS_NA = "neg_xF && in_PS && is_nucleon_incident"
-qel = "is_nucleon_incident == is_nucleon_produced && ancestor_incident_pdg == ancestor_produced_pdg && (ancestor_xF > 0.95 || (ancestor_pT < ancestor_xF - 0.5))"
+qel = "(ancestor_incident_pdg == ancestor_produced_pdg) && (ancestor_xF > 0.95 || (ancestor_pT < ancestor_xF - 0.5))"
 ancestor_xF_NA_8 = "ancestor_xF[is_nucleon_incident]"
 ancestor_xF_NA = "ancestor_xF[is_nucleon_incident && !qel]"
 ancestor_xF_NA_PS = "ancestor_xF[is_nucleon_incident && in_PS && !qel]"
@@ -183,48 +183,62 @@ ancestor_produced_theta_NA_Kp = "ancestor_produced_theta[(ancestor_produced_pdg 
 # Define histograms to create
 # see ROOT::RDataFrame::Histo1D or ::Histo2D
 
-## Figure 10
- [histograms.h_NC_PS]
+[histograms.h_ancestor_xF]
+dir = "nucleon_interactions"
+title = "N+C in PS; xF; interactions"
+bins = [200, -2.0, 2.0]
+var = "ancestor_xF"
+weight = "flux_wgt"
+
+ [histograms.h_ancestor_xF_NA]
  dir = "nucleon_interactions"
  title = "N+C in PS; xF; interactions"
  bins = [200, -2.0, 2.0]
- var = "ancestor_xF_NC_PS"
+ var = "ancestor_xF_NA_8"
  weight = "flux_wgt"
- #filter = "is_nucleon_incident && in_CPS"
-#
- [histograms.h_NC_OOPS]
- dir = "nucleon_interactions"
- title = "N+C OOPS; xF; interactions"
- bins = [200, -2.0, 2.0]
- var = "ancestor_xF_NC_OOPS"
- weight = "flux_wgt"
- #filter = "is_nucleon_incident && carbon_vol"
-#
- [histograms.h_NA_PS]
- dir = "nucleon_interactions"
- title = "N+A PS; xF; interactions"
- bins = [200, -2.0, 2.0]
- var = "ancestor_xF_NA_PS"
- weight = "flux_wgt"
- #filter = "is_nucleon_incident && in_PS"
-#
- [histograms.h_NA_OOPS]
- dir = "nucleon_interactions"
- title = "N+A OOPS; xF; interactions"
- bins = [200, -2.0, 2.0]
- var = "ancestor_xF_NA"
- weight = "flux_wgt"
- #filter = "is_nucleon_incident"
-#
- [histograms.h_NA_elastic]
- dir = "nucleon_interactions"
- title = "N+A elastic; xF; interactions"
- bins = [200, -2.0, 2.0]
- var = "ancestor_xF_elastic"
- weight = "flux_wgt"
-##################
 
-## Figure 11
+## Figure 10
+[histograms.h_NC_PS]
+dir = "nucleon_interactions"
+title = "N+C in PS; xF; interactions"
+bins = [200, -2.0, 2.0]
+var = "ancestor_xF_NC_PS"
+weight = "flux_wgt"
+#  #filter = "is_nucleon_incident && in_CPS"
+# #
+# [histograms.h_NC_OOPS]
+# dir = "nucleon_interactions"
+# title = "N+C OOPS; xF; interactions"
+# bins = [200, -2.0, 2.0]
+# var = "ancestor_xF_NC_OOPS"
+# weight = "flux_wgt"
+# #  #filter = "is_nucleon_incident && carbon_vol"
+# # #
+# [histograms.h_NA_PS]
+# dir = "nucleon_interactions"
+# title = "N+A PS; xF; interactions"
+# bins = [200, -2.0, 2.0]
+# var = "ancestor_xF_NA_PS"
+# weight = "flux_wgt"
+# #  #filter = "is_nucleon_incident && in_PS"
+# # #
+# [histograms.h_NA_OOPS]
+# dir = "nucleon_interactions"
+# title = "N+A OOPS; xF; interactions"
+# bins = [200, -2.0, 2.0]
+# var = "ancestor_xF_NA"
+# weight = "flux_wgt"
+# #filter = "is_nucleon_incident"
+# # #
+# [histograms.h_NA_elastic]
+# dir = "nucleon_interactions"
+# title = "N+A elastic; xF; interactions"
+# bins = [200, -2.0, 2.0]
+# var = "ancestor_xF_elastic"
+# weight = "flux_wgt"
+# ##################
+#
+# ## Figure 11
  [histograms.h_NA_pip]
  dir = "nucleon_interactions"
  title = "N+A #rightarrow #pi^{+}; p [GeV/c]; #theta [mrad]"
@@ -233,30 +247,21 @@ ancestor_produced_theta_NA_Kp = "ancestor_produced_theta[(ancestor_produced_pdg 
  xvar = "ancestor_produced_mom_NA_pip"
  yvar = "ancestor_produced_theta_NA_pip"
  weight = "flux_wgt"
-#
-[histograms.h_NA_Kp]
- dir = "nucleon_interactions"
- title = "N+A #rightarrow K^{+}; p [GeV/c]; #theta [mrad]"
- xbins = [200, 0, 20]
- ybins = [500, 0, 500]
- xvar = "ancestor_produced_mom_NA_Kp"
- yvar = "ancestor_produced_theta_NA_Kp"
- weight = "flux_wgt"
-#
- [histograms.h_NA_p]
- dir = "nucleon_interactions"
- title = "N+A #rightarrow p; p [GeV/c]; #theta [mrad]"
- xbins = [200, 0, 20]
- ybins = [500, 0, 500]
- xvar = "ancestor_produced_mom_NA_p"
- yvar = "ancestor_produced_theta_NA_p"
- weight = "flux_wgt"
-##################
-
-
-
-
-
-
-
-
+# #
+# [histograms.h_NA_Kp]
+#  dir = "nucleon_interactions"
+#  title = "N+A #rightarrow K^{+}; p [GeV/c]; #theta [mrad]"
+#  xbins = [200, 0, 20]
+#  ybins = [500, 0, 500]
+#  xvar = "ancestor_produced_mom_NA_Kp"
+#  yvar = "ancestor_produced_theta_NA_Kp"
+#  weight = "flux_wgt"
+# #
+#  [histograms.h_NA_p]
+#  dir = "nucleon_interactions"
+#  title = "N+A #rightarrow p; p [GeV/c]; #theta [mrad]"
+#  xbins = [200, 0, 20]
+#  ybins = [500, 0, 500]
+#  xvar = "ancestor_produced_mom_NA_p"
+#  yvar = "ancestor_produced_theta_NA_p"
+#  weight = "flux_wgt"
