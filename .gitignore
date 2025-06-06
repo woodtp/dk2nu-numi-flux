@@ -15,3 +15,4 @@ dk2nu/build/
 *.o
 *.so
 *venv*
+config_dev.toml

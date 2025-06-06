@@ -1,8 +1,13 @@
+#define _USE_MATH_DEFINES
+#include <cmath>
+
 #include "Weight.h"
 
 static constexpr double DEFAULT_DOUBLE = -9999.0;
 static constexpr double MUON_MASS = 0.1056583755; // [GeV/c^2]
 static constexpr double TAU_MASS = 1.77686; // [GeV/c^2]
+static constexpr double SQM_TO_SQCM = 100.0*100.0;
+static constexpr double FOUR_PI = 4.0 * M_PI;
 
 enum PDG {
   ELECTRON = 11,
@@ -10,7 +15,21 @@ enum PDG {
   MUON = 13,
   MUON_NEUTRINO = 14,
   TAU = 15,
-  TAU_NEUTRINO = 16
+  TAU_NEUTRINO = 16,
+  PION = 211,
+  KAON = 321,
+  K0L = 130,
+  K0S = 310,
+  K0 =  311,
+  P = 2212,
+  N = 2112,
+  LAMBDA = 3122,
+  SIGMAP = 3222,
+  SIGMA0 = 3212,
+  SIGMAM = 3112,
+  XIM = 3312,
+  ETA = 221,
+  ETAPRIME = 331
 };
 
 static double clip(const double val)
@@ -36,28 +55,38 @@ std::vector<std::string> get_volumes(const ROOT::RVec<bsim::Ancestor>& ancestors
   return vol;
 }
 
+std::vector<bool> is_carbon_vol(const ROOT::RVec<bsim::Ancestor>& ancestors)
+{
+  std::vector<bool> vol;
+  vol.reserve(ancestors.size() - 2);
+  for (std::size_t i = 1; i < ancestors.size() - 1; ++i) {
+    vol.emplace_back(ancestors[i].ivol == "TGT1" || ancestors[i].ivol == "Budal_Monitor" || ancestors[i].ivol == "Budal_HFVS" || ancestors[i].ivol == "Budal_VFHS");
+  }
+  return vol;
+}
+
 std::vector<double> get_incident_momenta(const ROOT::RVec<bsim::Ancestor>& ancestors)
 {
-  std::vector<double> p_inc;
-  p_inc.reserve(ancestors.size() - 1);
+  std::vector<double> p_inc(ancestors.size() - 1, DEFAULT_DOUBLE);
   const bool is_old_g4 = ancestors[0].proc == "Primary";
   for (std::size_t i = 0; i < ancestors.size() - 1; ++i) {
+    if(skip_particle(ancestors[i])) continue;
     const bsim::Ancestor& part = i == 0 || !is_old_g4 ? ancestors[i] : ancestors[i - 1];
-    p_inc.push_back(std::sqrt(part.pprodpx*part.pprodpx +
-                              part.pprodpy*part.pprodpy +
-                              part.pprodpz*part.pprodpz));
+    p_inc[i] = std::sqrt(part.pprodpx*part.pprodpx +
+                         part.pprodpy*part.pprodpy +
+                         part.pprodpz*part.pprodpz);
   }
   return p_inc;
 }
 
 std::vector<double> get_produced_momenta(const ROOT::RVec<bsim::Ancestor>& ancestors)
 {
-  std::vector<double> p_prod;
-  p_prod.reserve(ancestors.size() - 1);
+  std::vector<double> p_prod(ancestors.size() - 1, DEFAULT_DOUBLE);
   for (std::size_t i = 0; i < ancestors.size() - 1; ++i) {
-      p_prod.push_back(std::sqrt(ancestors[i].startpx*ancestors[i].startpx
-                               + ancestors[i].startpy*ancestors[i].startpy
-                               + ancestors[i].startpz*ancestors[i].startpz));
+    if(skip_particle(ancestors[i])) continue;
+    p_prod[i] = std::sqrt(ancestors[i].startpx*ancestors[i].startpx
+                          + ancestors[i].startpy*ancestors[i].startpy
+                          + ancestors[i].startpz*ancestors[i].startpz);
   }
   return p_prod;
 }
@@ -185,39 +214,112 @@ std::vector<double> calc_xF(const ROOT::RVec<bsim::Ancestor>& ancestors,
   return xF;
 }
 
-double calc_weight(const bsim::Decay& decay,
-                   const double det_angle,
-                   const double energy_ratio,
-                   const double parent_energy,
-                   const double nu_energy,
-                   const double gamma,
-                   const ROOT::RVec<double>& rr)
-{
-  // See: https://github.com/NuSoftHEP/dk2nu/blob/main/tree/calcLocationWeights.cxx#L48
+static double pdgid_to_mass(int pdgid) {
+  switch(std::abs(pdgid)) {
+    case PDG::MUON:
+        return MUON_MASS;
+    case PDG::TAU:
+        return TAU_MASS;
+    case PDG::PION:
+        return 0.13957061;
+    case PDG::KAON:
+        return 0.493677;
+    case PDG::K0L:
+    case PDG::K0S:
+    case PDG::K0:
+        return 0.497611;
+    case PDG::P:
+        return 0.938272;
+    case PDG::N:
+        return 0.939565;
+    case PDG::LAMBDA:
+        return 1.115683;
+    case PDG::SIGMAP:
+        return 1.18937;
+    case PDG::SIGMA0:
+        return 1.92642;
+    case PDG::SIGMAM:
+        return 1.19745;
+    case PDG::XIM:
+        return 1.32171;
+    case PDG::ETAPRIME:
+        return 0.95778;
+    case PDG::ETA:
+        return 0.547862;
+    default:
+      return -1.0;
+  }
+}
 
-  double wght = det_angle*decay.nimpwt*(energy_ratio*energy_ratio);
+static double parent_energy(const bsim::Decay& decay) {
+  const double parent_mass = pdgid_to_mass(decay.ptype);
+  const double parent_p2 = decay.pdpx*decay.pdpx + decay.pdpy*decay.pdpy + decay.pdpz*decay.pdpz;
+  return std::sqrt(parent_p2 + parent_mass*parent_mass);
+}
+
+static double emratio(const bsim::Decay& decay, const ROOT::RVec<double>& pos) {
+  if (const auto size = pos.size() != 3) {
+    std::cout << "[ERROR:Weight.cc:emratio] Input position had length != 3. pos.size() = " << size << std::endl;
+    exit(1);
+  }
+  const double gamma = parent_energy(decay) / pdgid_to_mass(decay.ptype);
+  const double beta = std::sqrt(1 - 1 / (gamma*gamma));
+
+  const ROOT::RVec<double> rr {pos[0] - decay.vx, pos[1] - decay.vy, pos[2] - decay.vz};
+  const double rrmag2 = rr[0]*rr[0] + rr[1]*rr[1] + rr[2]*rr[2];
+
+  const double parent_p2 = decay.pdpx*decay.pdpx + decay.pdpy*decay.pdpy + decay.pdpz*decay.pdpz;
+  const double costh = clip((decay.pdpx*rr[0] + decay.pdpy*rr[1] + decay.pdpz*rr[2]) / std::sqrt(parent_p2*rrmag2));
+  const double emratio = 1 / (gamma * (1 - beta * costh));
+
+  return emratio;
+}
+
+double neutrino_energy(const bsim::Decay& decay, const ROOT::RVec<double>& pos) {
+  return decay.necm*emratio(decay, pos);
+}
+
+static double dot_product(const double* a, const double* b, const std::size_t dim) {
+  double result = 0.;
+  for (std::size_t i = 0; i < dim; ++i) {
+    result += a[i]*b[i];
+  }
+  return result;
+}
+
+double calc_weight(const bsim::Decay& decay,
+                   const ROOT::RVec<double>& pos)
+{
+  // Yoinked from https://github.com/NuSoftHEP/dk2nu/blob/main/tree/calcLocationWeights.cxx#L48
+  if (const auto size = pos.size() != 3) {
+    std::cout << "[ERROR:Weight.cc:calc_weight] Input position had length != 3. pos.size() = " << size << std::endl;
+    exit(1);
+  }
+
+  const ROOT::RVec<double> rr {pos[0] - decay.vx, pos[1] - decay.vy, pos[2] - decay.vz};
+  const double rrmag2 = rr[0]*rr[0] + rr[1]*rr[1] + rr[2]*rr[2];
+
+  const double sangdet = SQM_TO_SQCM / rrmag2 / FOUR_PI;
+
+  const double emrat = emratio(decay, pos);
+  const double wght = sangdet*decay.nimpwt*emrat*emrat; // nu flux [m^{-2}]
 
   // if the nu parent is not a muon, we're done.
   if (std::abs(decay.ptype) != PDG::MUON) return wght;
 
   // For muon parents, we need to apply correction for anisotropic decay
 
-  auto dot_product = [](const double* a, const double* b, const std::size_t dim) {
-    double result = 0.;
-    for (std::size_t i = 0; i < dim; ++i) {
-      result += a[i]*b[i];
-    }
-    return result;
-  };
-
+  double p_energy = parent_energy(decay);
   // Boost new neutrino to mu decay cm
   const double beta[] = {
-    decay.pdpx / parent_energy,
-    decay.pdpy / parent_energy,
-    decay.pdpz / parent_energy
+    decay.pdpx / p_energy,
+    decay.pdpy / p_energy,
+    decay.pdpz / p_energy
   };
 
-  const double rr_mag = std::sqrt(rr[0]*rr[0] + rr[1]*rr[1] + rr[2]*rr[2]);
+  const double rr_mag = std::sqrt(rrmag2);
+
+  const double nu_energy = decay.necm*emrat;
 
   const double p_nu[] = {
     rr[0]*nu_energy / rr_mag,
@@ -225,6 +327,7 @@ double calc_weight(const bsim::Decay& decay,
     rr[2]*nu_energy / rr_mag
   };
 
+  double gamma = parent_energy(decay) / pdgid_to_mass(decay.ptype);
   double partial = gamma*dot_product(beta, p_nu, 3);
   partial = nu_energy - partial / (gamma + 1.);
 
@@ -278,10 +381,10 @@ double calc_weight(const bsim::Decay& decay,
     else if (std::abs(decay.ntype) == PDG::TAU_NEUTRINO) {
       const double xnu = 2.*decay.necm / TAU_MASS;
       wt_ratio = ((3. - 2.*xnu) - (1. - 2.*xnu)*costh) / (3. - 2.*xnu);
-      std::cout << "calculating weight for tau neutrino; this may not be correct" << std::endl;
+      std::cout << "[INFO:Weight.cc:calc_weight] calculating weight for tau neutrino; this may not be correct" << std::endl;
     }
     else {
-      std::cout << "eventRates:: Bad neutrino type = " << decay.ntype << std::endl;
+      std::cout << "[INFO:Weight.cc:calc_weight] eventRates:: Bad neutrino type = " << decay.ntype << std::endl;
     }
   }
   return wght*wt_ratio;

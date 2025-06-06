@@ -1,12 +1,13 @@
 #!/usr/bin/env python3
 
 import argparse
+from collections.abc import Iterable
 import datetime
 import logging
 import sys
 import time
 from pathlib import Path
-from typing import Any, Callable
+from typing import Any, Callable, Optional
 
 import ROOT  # type: ignore
 import uproot
@@ -20,20 +21,16 @@ import numpy as np
 
 logging.basicConfig(level=logging.INFO, format="[%(levelname)s] %(message)s")
 
-def get_pot(files: str, pot_per_file: int) -> int:
-    path, pattern = files.rsplit("/", 1)
-    nfiles = len(list(Path(path).glob(pattern)))
-    return pot_per_file * nfiles
-    # This is the more 'proper' way to calculate POT, but it's slow
-    # df = ROOT.RDataFrame("dkmetaTree", files)
-    # pot = df.Sum("pots").GetValue()
-    # return pot
+def get_pot(files: str) -> int:
+    df = ROOT.RDataFrame("dkmetaTree", files)
+    return df.Sum("pots").GetValue()
 
 
 def run_analysis(
     in_fname: str,
     out_fname: str,
     sample_name: str,
+    det_loc: list[float],
     cfg: dict[str, Any],
     debug: bool = False,
 ) -> None:
@@ -52,39 +49,27 @@ def run_analysis(
 
     logging.debug(f"Loaded {in_fname}. Applying definitions...")
 
-    det_loc: list[float] = [float(x) for x in cfg["location"]]
-    if len(det_loc) != 3:
-        logging.error(
-            f"Invalid location format: {det_loc}. Please provide '[x, y, z]'. Exiting..."
-        )
-        sys.exit(1)
-    logging.info(f"Going to calculate weights for location: {det_loc}")
+    pot = get_pot(in_fname)
+    pot_wgt = 1.0 / pot
 
-    logging.debug(f"Location: {det_loc}")
-
-    pot = get_pot(in_fname, cfg["pot_per_file"])
-    # pot_wgt = 1.0 / pot
-
-    # logging.info(f"POT = {pot:_}. Weight available as 'pot_wgt' = 1/POT = {pot_wgt:e}")
+    logging.info(f"POT = {pot:_}. Weight available as 'pot_wgt' = 1/POT = {pot_wgt:e}")
+    df = df.Define("pot_wgt", str(pot_wgt))
 
     df = df.Define("det_loc", f"ROOT::RVec<double>{{ {det_loc[0]}, {det_loc[1]}, {det_loc[2]} }}")
 
-    for other_key, val in cfg["aliases"].items():
-        logging.debug(f"Applying Alias: {val} -> {other_key}")
-        df = df.Alias(other_key, val)
+    for key, val in cfg["aliases"].items():
+        logging.debug(f"Applying Alias: {val} -> {key}")
+        df = df.Alias(key, val)
 
-    for other_key, val in cfg["definitions"].items():
-        logging.debug(f"Applying definition: {other_key}")
-        df = df.Define(other_key, val)
+    for key, val in cfg["definitions"].items():
+        logging.debug(f"Applying definition: {key}")
+        df = df.Define(key, val)
 
     for val in cfg["filters"].values():
         logging.debug(f"Applying filter: {val}")
         df = df.Filter(val)
 
-    tree_name = f"fluxTree_{sample_name}"
-    tree_log_str = f"Preparing Tree '{tree_name}' with {len(cfg['save_branches'])} branches:\n\n"
-    for branch in cfg["save_branches"]:
-        tree_log_str += "* " + branch + "\n"
+    det_loc_str = f"{det_loc[0]}_{det_loc[1]}_{det_loc[2]}"
 
     def _is_regular_bins(bins):
         return len(bins) == 3 and all(isinstance(x, int) or isinstance(x, float) for x in bins)
@@ -117,6 +102,13 @@ def run_analysis(
             hist_name = f"{sample_name}/{key}"
 
         # checking whether it's a 1D or 2D histogram
+        def _hist_info(h):
+            info = "Registering histogram:\n"
+            for k, v in h.items():
+                info += f"    {k}: {v}\n"
+            return info
+
+        logging.info(_hist_info(h))
         if "yvar" not in h:
             if _is_regular_bins(h["bins"]):
                 nbins, low, high = h["bins"]
@@ -181,21 +173,29 @@ def run_analysis(
             else:
                 raise ValueError(f"Invalid binning format for histogram {key}. Exiting...")
 
-    opts = ROOT.RDF.RSnapshotOptions()  # type: ignore
-    opts.fMode = "UPDATE"
+    save_branches: Optional[list[str]] = cfg.get("save_branches", None)
 
-    if len(cfg["save_branches"]) == 1 and cfg["save_branches"][0] == "*":
-        logging.info(tree_log_str)
-        logging.info(
-            f"Snapshotting to {out_fname}. Event loop will be executed now, this might take a while..."
-        )
-        df.Snapshot(tree_name, out_fname, list(cfg["aliases"].keys()) + list(cfg["definitions"].keys()), opts)
-    elif len(cfg["save_branches"]) > 0:
-        logging.info(tree_log_str)
-        logging.info(
-            f"Snapshotting to {out_fname}. Event loop will be executed now, this might take a while..."
-        )
-        df.Snapshot(tree_name, out_fname, cfg["save_branches"], opts)  # type: ignore
+    if save_branches is not None:
+        tree_name = f"fluxTree_{det_loc_str}_{sample_name}"
+        tree_log_str = f"Preparing Tree '{tree_name}' with {len(save_branches)} branches:\n\n"
+        for branch in save_branches:
+            tree_log_str += "* " + branch + "\n"
+
+        opts = ROOT.RDF.RSnapshotOptions()  # type: ignore
+        opts.fMode = "UPDATE"
+
+        if len(save_branches) == 1 and save_branches[0] == "*":
+            logging.info(tree_log_str)
+            logging.info(
+                f"Snapshotting to {out_fname}. Event loop will be executed now, this might take a while..."
+            )
+            df.Snapshot(tree_name, out_fname, list(cfg["aliases"].keys()) + list(cfg["definitions"].keys())) #, opts)
+        elif len(save_branches) > 0:
+            logging.info(tree_log_str)
+            logging.info(
+                f"Snapshotting to {out_fname}. Event loop will be executed now, this might take a while..."
+            )
+            df.Snapshot(tree_name, out_fname, save_branches, opts)  # type: ignore
     else:
         logging.info("Not saving any branches.")
 
@@ -205,16 +205,16 @@ def run_analysis(
         for h in hists:
             hname = h.GetName()
             h_obj = h.GetValue()
-            logging.info(f"Writing histogram {hname} to {out_fname}...")
+            logging.info(f"Writing histogram {hname} to {out_fname}:{det_loc_str}/...")
             logging.debug(f"{h}, {h_obj}")
-            f[hname] = h_obj
+            f[det_loc_str + "/" + hname] = h_obj
 
-        logging.info(f"Writing POT to {out_fname}:{sample_name}/hpot")
+        logging.info(f"Writing {pot} POT to {out_fname}:{sample_name}/hpot")
 
         hpot = ROOT.TH1D("hpot", "POT", 1, 0, 1)  # type: ignore
         hpot.SetBinContent(1, pot)
 
-        f[f"{sample_name}/hpot"] = hpot
+        f[f"{det_loc_str}/{sample_name}/hpot"] = hpot
 
 
 def main() -> None:
@@ -275,7 +275,9 @@ def main() -> None:
     for sample_name, files in cfg["file_sets"].items():
         parent_dir, pattern = files.rsplit("/", 1)
 
-        n_files = len(list(Path(parent_dir).glob(pattern)))
+        file_list = [file for file in Path(parent_dir).glob(pattern) if file.is_file() and file.stat().st_size > 0]
+        file_list = file_list[:cfg.get("max_files", None)]
+        n_files = len(file_list)
 
         logging.info(f"Found {n_files} files in {parent_dir}")
 
@@ -283,11 +285,38 @@ def main() -> None:
             logging.error(f"Skipping {sample_name} as no files were found...")
             continue
 
-        run_analysis(files, str(out_fname), sample_name, cfg, debug=args.debug)
+        vec_files = ROOT.std.vector(ROOT.std.string)()
+        for file in file_list:
+            vec_files.push_back(str(file))
+        if isinstance(cfg["location"], Iterable):
+            det_locs = [[float(x) for x in loc] for loc in cfg["location"]]
+        else:
+            det_locs  = [[float(x) for x in cfg["location"]]]
+
+        for det_loc in det_locs:
+            if len(det_loc) != 3:
+                logging.error(
+                    f"Invalid location format: {det_loc}. Please provide '[x, y, z]'. Exiting..."
+                )
+                sys.exit(1)
+            logging.info(f"Going to calculate weights for location: {det_loc}")
+
+            logging.debug(f"Location: {det_loc}")
+
+            # det_locs = np.array([
+            #         np.arange(0, 1000, step=100),
+            #         np.zeros(10),
+            #         np.full(10, 10000)
+            #         ])
+            run_analysis(vec_files, str(out_fname), sample_name, det_loc, cfg, debug=args.debug)
 
 
 if __name__ == "__main__":
     start = time.perf_counter()
-    main()
+    try:
+        main()
+    except KeyboardInterrupt:
+        logging.info("Received keyboard interrupt. Exiting...")
+        sys.exit(0)
     end = time.perf_counter()
     print(f"\nFinished in {datetime.timedelta(seconds=end - start)}")

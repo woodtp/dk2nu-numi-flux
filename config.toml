@@ -1,15 +1,18 @@
-location = [450.37, 7991.98, 79512.66]  # ICARUS TPC center in NuMI coords [cm]
-# location = [0, 0, 103648.837]  # 2x2
+location = [
+    [450.37, 7991.98, 79512.66],  # ICARUS TPC center in NuMI coords [cm]
+    # [450.37, 7833.84, 79521.90], # ICARUS TPC bot
+    # [450.37, 8150.12, 79503.42] # ICARUS TPC Top
+    # [0, 0, 103648.837]  # 2x2/on-axis
+]
 
 output_file = "output.root"
-
-pot_per_file = 500_000
 
 # list of branches to save in the tree. No Tree is saved if this is empty. If set to ["*"], all branches are saved.
 # save_branches = ["nu_pdg", "nu_energy", "weight"]
 # save_branches = ["*"]
 save_branches = []
 
+# max_files = 1  # set this if you want to limit the number of files read
 [file_sets]
 run0_fhc = "/path/to/my/files/*.root" ## OVERRIDE THIS
 
@@ -37,24 +40,21 @@ no_dar = "parent_momentum > 0."
 is_numu           = "nu_pdg == 14"
 is_numubar        = "nu_pdg == -14"
 is_nue            = "nu_pdg == 12"
-is_nuebar	      = "nu_pdg == -12"
+is_nuebar	  = "nu_pdg == -12"
 is_pipm           = "abs(parent_pdg) == 211"
 is_Kpm            = "abs(parent_pdg) == 321"
 is_muon           = "abs(parent_pdg) == 13"
 is_K0             = "parent_pdg == 310 || parent_pdg == 130"
-parent_momentum   = "sqrt(pdpx*pdpx + pdpy*pdpy + pdpz*pdpz)"
+parent_momentum   = "sqrt(pdpx*pdpx + pdpy*pdpy + pdpz*pdpz)"     # [GeV/c]
 decay_vertex      = "ROOT::RVec<double>{vx, vy, vz}"
 rr                = "det_loc - decay_vertex"
-v_parent_momentum = "ROOT::RVec<double>{pdpx, pdpy, pdpz}"
-sangdet           = "Numba::calc_solid_angle(rr)"                         # Solid angle as fraction of 4pi
-costh 		      = "Numba::calc_costheta_par(v_parent_momentum, rr)"     # Cosine of the angle between the parent particle and the detector component
-parent_mass       = "Numba::pdg_to_mass(parent_pdg)"
-parent_energy     = "Numba::calc_energy(v_parent_momentum, parent_mass)"  # Calculate the energy of the parent particle at the decay vertex
-pgamma            = "Numba::calc_gamma(parent_energy, parent_mass)"       # Calculate the gamma factor of the parent particle
-emrat             = "Numba::calc_energy_in_beam(pgamma, costh)"           # Weighted neutrino energy in the lab frame. Small angle approximation.
-nu_energy         = "dk2nu.decay.necm * emrat"                            # Lorentz boost the neutrino energy into the lab frame
-flux_wgt          = "calc_weight(dk2nu.decay, sangdet, emrat, parent_energy, nu_energy, pgamma, rr)"
-theta_p           = "Numba::theta_p(v_parent_momentum, det_loc)"
+baseline          = "Numba::calc_magnitude(rr)/100.0"             # Distance from the decay vertex to the detector
+v_parent_momentum = "ROOT::RVec<double>{pdpx, pdpy, pdpz}"        # [GeV/c] Neutrino's primary parent decay momentum
+nu_energy         = "neutrino_energy(decay, det_loc)"             # [GeV] Boost the neutrino energy into the lab frame
+flux_wgt          = "calc_weight(decay, det_loc)"                 # [m^-2]
+# pot_wgt is calculated at runtime as 1/total POT.
+flux_wgt_pot      = "pot_wgt*flux_wgt"                            # flux_wgt / total POT
+theta_p           = "Numba::theta_p(v_parent_momentum, det_loc)"  # [deg] Neutrino's primary parent trajectory w.r.t. NuMI axis at decay vertex
 # par_codes = "Numba::parent_to_code(dk2nu.ancestor.pdg)"
 # target_codes = "Numba::target_to_code(dk2nu.ancestor.nucleus)"
 # ancestor_vol      = "get_volumes(dk2nu.ancestor)"

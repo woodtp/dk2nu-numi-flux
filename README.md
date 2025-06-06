@@ -38,9 +38,9 @@ Prerequisites:
 Both are prerequisites for [Dk2Nu](https://github.com/NuSoftHEP/dk2nu), which will built as part of the project.
 
 ```shell
-$ git clone https://github.com/woodtp/dk2nu-numi-flux.git  # Clone the repository
-$ cd dk2nu-numi-flux  # Move into the project directory
-$ ./build.sh  # Build the project
+git clone https://github.com/woodtp/dk2nu-numi-flux.git  # Clone the repository
+cd dk2nu-numi-flux  # Move into the project directory
+./build.sh  # Build the project
 ```
 
 ### Building in an ICARUS GPVM
@@ -51,7 +51,8 @@ This script will set up the following dependencies:
 - ROOT v6_28_10a
 
 ```shell
-$ source ./build_sl7_sourceme.sh  # Build the project, have to source instead of execute if on a FNAL GPVM
+source setup_sl7.sh  # setup envvars and dependencies
+make                 # Build the libs
 ```
 
 ## Running the code
